@@ -21,7 +21,7 @@ The container is published on GitHub Container Registry (GHCR) at
 |===
 | Tag | OS | Architecture | Runner | Notes
 
-| `latest` / `edge`
+| `latest`
 | Linux
 | amd64, arm64
 | Any Docker host

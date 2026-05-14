@@ -42,7 +42,7 @@ Append `docker` to any build target to run inside the container instead of local
 Version is tracked in the `VERSION` file (semver). Publishing workflow:
 
 1. **release-tag** workflow (manual `workflow_dispatch`) — updates VERSION file and pushes a `v*` tag
-2. **build-push** workflow — triggers on push to main (publishes `edge` tag) and on `v*` tags (publishes versioned tags). Builds multi-platform (amd64/arm64) and pushes to GHCR only.
+2. **build-push** workflow — triggers on push to main (publishes `latest` tag) and on `v*` tags (publishes versioned tags). Builds multi-platform (amd64/arm64) and pushes to GHCR only.
 
 To release a new version: run the release-tag workflow with the desired version number.
 
