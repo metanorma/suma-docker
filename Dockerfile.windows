@@ -1,25 +1,35 @@
 ARG BASE_IMAGE=metanorma/metanorma:windows-ltsc2025-1.15.7
-
-FROM ${BASE_IMAGE}
-LABEL maintainer="Metanorma Team <metanorma@ribose.com>"
-
 ARG EENGINE_VERSION=5.2.7
 
-# Fix Ruby SSL on Windows Server Core containers
-RUN powershell -Command \
-      "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; \
-       Invoke-WebRequest -Uri 'https://curl.se/ca/cacert-2024-12-31.pem' -OutFile 'C:\cacert.pem'"
-ENV SSL_CERT_FILE=C:\cacert.pem
+# Builder stage: install additional gems on a clean Windows image where
+# Ruby networking works (the metanorma runner image has ENOTSOCK issues).
+FROM mcr.microsoft.com/windows/servercore:ltsc2025 AS builder
 
-# Install SUMA and stepmod-utils on top of the metanorma base image gems
-RUN gem install suma stepmod-utils
+RUN powershell -Command \
+      "Set-ExecutionPolicy Bypass -Scope Process -Force; \
+       [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; \
+       Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))"
+
+RUN choco install -y ruby --version=3.4.5.1
+
+RUN setx PATH "%PATH%;C:\tools\ruby34\bin"
+
+RUN gem install suma stepmod-utils --install-dir C:\extra-gems --no-document
+
+# Runner stage: metanorma base image + extra gems + EXPRESS tools
+FROM ${BASE_IMAGE}
+
+# Copy additional gems into the metanorma Ruby installation
+COPY --from=builder C:/extra-gems C:/tools/ruby34/lib/ruby/gems/3.4.0
 
 # Install eengine (Windows x86-64)
 RUN powershell -Command \
-      "Invoke-WebRequest -Uri 'https://github.com/expresslang/eengine-releases/releases/download/eeng-${EENGINE_VERSION}/eengine-${EENGINE_VERSION}-win-x86-64-sbcl.exe' -OutFile 'C:\Windows\eengine.exe'"
+      "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; \
+       Invoke-WebRequest -Uri 'https://github.com/expresslang/eengine-releases/releases/download/eeng-${EENGINE_VERSION}/eengine-${EENGINE_VERSION}-win-x86-64-sbcl.exe' -OutFile 'C:\Windows\eengine.exe'"
 
 # Install eep (Windows x86)
 RUN powershell -Command \
-      "Invoke-WebRequest -Uri 'https://github.com/expresslang/eep-releases/raw/main/windows/eep-windows-x86.exe' -OutFile 'C:\Windows\eep.exe'"
+      "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; \
+       Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/expresslang/eep-releases/main/windows/eep-windows-x86.exe' -OutFile 'C:\Windows\eep.exe'"
 
 WORKDIR c:/metanorma
