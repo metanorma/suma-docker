@@ -5,6 +5,12 @@ LABEL maintainer="Metanorma Team <metanorma@ribose.com>"
 
 ARG EENGINE_VERSION=5.2.7
 
+# Fix Ruby SSL on Windows Server Core containers
+RUN powershell -Command \
+      "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; \
+       Invoke-WebRequest -Uri 'https://curl.se/ca/cacert-2024-12-31.pem' -OutFile 'C:\cacert.pem'"
+ENV SSL_CERT_FILE=C:\cacert.pem
+
 # Install SUMA and stepmod-utils on top of the metanorma base image gems
 RUN gem install suma stepmod-utils
 
