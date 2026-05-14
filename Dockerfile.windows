@@ -5,9 +5,8 @@ LABEL maintainer="Metanorma Team <metanorma@ribose.com>"
 
 ARG EENGINE_VERSION=5.2.7
 
-# Install SUMA and dependencies (no lock file — base image has different Bundler/Ruby)
-COPY Gemfile c:/setup/Gemfile
-RUN cd c:/setup && bundle install
+# Install SUMA and stepmod-utils on top of the metanorma base image gems
+RUN gem install suma stepmod-utils
 
 # Install eengine (Windows x86-64)
 RUN powershell -Command \
