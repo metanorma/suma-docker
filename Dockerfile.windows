@@ -5,13 +5,12 @@ LABEL maintainer="Metanorma Team <metanorma@ribose.com>"
 
 ARG EENGINE_VERSION=5.2.7
 
-# Install SUMA and dependencies using the repo's Gemfile.lock for reproducibility
-COPY Gemfile Gemfile.lock c:/setup/
+# Install SUMA and dependencies (no lock file — base image has different Bundler/Ruby)
+COPY Gemfile c:/setup/Gemfile
 RUN cd c:/setup && bundle install
 
 # Install eengine (Windows x86-64)
-RUN setx PATH "%PATH%;C:\tools\ruby34\bin" && \
-    powershell -Command \
+RUN powershell -Command \
       "Invoke-WebRequest -Uri 'https://github.com/expresslang/eengine-releases/releases/download/eeng-${EENGINE_VERSION}/eengine-${EENGINE_VERSION}-win-x86-64-sbcl.exe' -OutFile 'C:\Windows\eengine.exe'"
 
 # Install eep (Windows x86)
