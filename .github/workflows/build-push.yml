@@ -46,7 +46,7 @@ jobs:
       - name: Show version
         run: echo ${{ steps.version.outputs.result }}
       - name: Retrieve tags
-        run: git fetch --depth=1 origin +refs/tags/*:refs/tags/*
+        run: git fetch --depth=1 origin +refs/tags/*:refs/tags/* || true
       - name: Set output variables
         id: check
         run: |
