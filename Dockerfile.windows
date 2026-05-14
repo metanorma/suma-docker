@@ -11,7 +11,8 @@ RUN powershell -Command \
        [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; \
        Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))"
 
-RUN choco install -y ruby --version=3.4.5.1 msys2
+RUN choco install -y ruby --version=3.4.5.1
+RUN choco install -y msys2
 
 RUN setx PATH "%PATH%;C:\tools\msys64\usr\bin;C:\tools\ruby34\bin"
 
