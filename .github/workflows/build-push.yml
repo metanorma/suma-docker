@@ -115,9 +115,11 @@ jobs:
           - os: windows-2025
             id: ltsc2025
             base_image: metanorma/metanorma:windows-ltsc2025-1.15.7
+            builder_image: mcr.microsoft.com/windows/servercore:ltsc2025
           - os: windows-2022
             id: ltsc2022
             base_image: metanorma/metanorma:windows-ltsc2022-1.15.7
+            builder_image: mcr.microsoft.com/windows/servercore:ltsc2022
 
     steps:
       - uses: actions/checkout@v4
@@ -130,7 +132,7 @@ jobs:
 
       - name: Build and push
         run: |
-          docker build --pull --no-cache -t ghcr.io/metanorma/suma-docker:windows-${{ matrix.root_image.id }} -f Dockerfile.windows --build-arg BASE_IMAGE=${{ matrix.root_image.base_image }} .
+          docker build --pull --no-cache -t ghcr.io/metanorma/suma-docker:windows-${{ matrix.root_image.id }} -f Dockerfile.windows --build-arg BASE_IMAGE=${{ matrix.root_image.base_image }} --build-arg BUILDER_IMAGE=${{ matrix.root_image.builder_image }} .
           docker push ghcr.io/metanorma/suma-docker:windows-${{ matrix.root_image.id }}
         shell: bash
 
@@ -190,14 +192,16 @@ jobs:
           - os: windows-2025
             id: ltsc2025
             base_image: metanorma/metanorma:windows-ltsc2025-1.15.7
+            builder_image: mcr.microsoft.com/windows/servercore:ltsc2025
           - os: windows-2022
             id: ltsc2022
             base_image: metanorma/metanorma:windows-ltsc2022-1.15.7
+            builder_image: mcr.microsoft.com/windows/servercore:ltsc2022
 
     steps:
       - uses: actions/checkout@v4
 
       - name: Build (no push)
         run: |
-          docker build --pull --no-cache -t suma:test -f Dockerfile.windows --build-arg BASE_IMAGE=${{ matrix.root_image.base_image }} .
+          docker build --pull --no-cache -t suma:test -f Dockerfile.windows --build-arg BASE_IMAGE=${{ matrix.root_image.base_image }} --build-arg BUILDER_IMAGE=${{ matrix.root_image.builder_image }} .
         shell: bash

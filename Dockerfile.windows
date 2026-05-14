@@ -1,9 +1,10 @@
 ARG BASE_IMAGE=metanorma/metanorma:windows-ltsc2025-1.15.7
+ARG BUILDER_IMAGE=mcr.microsoft.com/windows/servercore:ltsc2025
 ARG EENGINE_VERSION=5.2.7
 
 # Builder stage: install additional gems on a clean Windows image where
 # Ruby networking works (the metanorma runner image has ENOTSOCK issues).
-FROM mcr.microsoft.com/windows/servercore:ltsc2025 AS builder
+FROM ${BUILDER_IMAGE} AS builder
 
 RUN powershell -Command \
       "Set-ExecutionPolicy Bypass -Scope Process -Force; \
