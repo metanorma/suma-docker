@@ -1,0 +1,25 @@
+# Build artifacts
+_site/
+*.tar
+*.tar.gz
+
+# Generated Makefile intermediates
+metanorma-single.yml
+metanorma-pattern.yml
+collection-single.yml
+collection-pattern.yml
+*-log.txt
+
+# Feature build state
+.feature-build-worktree
+.feature-build-module
+.feature-build-commit
+.diff-build-worktree
+
+# Ruby
+.bundle/
+vendor/
+
+# OS
+.DS_Store
+Thumbs.db

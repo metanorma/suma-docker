@@ -1,0 +1,21 @@
+ARG BASE_IMAGE=metanorma/metanorma:windows-ltsc2025-1.15.7
+
+FROM ${BASE_IMAGE}
+LABEL maintainer="Metanorma Team <metanorma@ribose.com>"
+
+ARG EENGINE_VERSION=5.2.7
+
+# Install SUMA and dependencies using the repo's Gemfile.lock for reproducibility
+COPY Gemfile Gemfile.lock c:/setup/
+RUN cd c:/setup && bundle install
+
+# Install eengine (Windows x86-64)
+RUN setx PATH "%PATH%;C:\tools\ruby34\bin" && \
+    powershell -Command \
+      "Invoke-WebRequest -Uri 'https://github.com/expresslang/eengine-releases/releases/download/eeng-${EENGINE_VERSION}/eengine-${EENGINE_VERSION}-win-x86-64-sbcl.exe' -OutFile 'C:\Windows\eengine.exe'"
+
+# Install eep (Windows x86)
+RUN powershell -Command \
+      "Invoke-WebRequest -Uri 'https://github.com/expresslang/eep-releases/raw/main/windows/eep-windows-x86.exe' -OutFile 'C:\Windows\eep.exe'"
+
+WORKDIR c:/metanorma

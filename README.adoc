@@ -1,0 +1,187 @@
+= Docker container for SUMA (and building ISO 10303)
+
+image:https://img.shields.io/github/v/tag/metanorma/suma-docker?label=version&sort=semver[Version]
+image:https://img.shields.io/github/actions/workflow/status/metanorma/suma-docker/build-push.yml?branch=main[Build Status]
+image:https://img.shields.io/badge/ghcr-metanorma%2Fsuma--docker-blue[GHCR]
+image:https://img.shields.io/docker/image-size/metanorma/metanorma/1.15.7?label=base%20image%20size[Base Image Size]
+
+== Purpose
+
+This repository is for publishing a Docker container that provides
+SUMA and the tools needed to build ISO 10303 from source.
+
+The source for ISO 10303 is available at:
+
+* Official ISO BitBucket: https://sd.iso.org/bitbucket-pilot/projects/ISOTC184SC4/repos/wg12-step/
+* Metanorma GitHub mirror: https://github.com/metanorma/iso-10303
+
+
+== Supported platforms
+
+The container is published as a multi-architecture image on GitHub Container
+Registry (GHCR) at `ghcr.io/metanorma/suma-docker`.
+
+[cols="1,1,1,2,3"]
+|===
+| Tag | OS | Architecture | Runner | Notes
+
+| `latest` / `edge`
+| Linux
+| amd64, arm64
+| Any Docker host
+| Multi-arch manifest. Default tag.
+
+| `1.0.0`, `1.0`, `1`
+| Linux
+| amd64, arm64
+| Any Docker host
+| Versioned releases (multi-arch manifest).
+
+| `windows`
+| Windows
+| amd64
+| Windows Server 2022 or 2025
+| Manifest pointing to `windows-ltsc2025`.
+
+| `windows-ltsc2025`
+| Windows
+| amd64
+| Windows Server 2025
+| Requires Windows host with containers enabled.
+
+| `windows-ltsc2022`
+| Windows
+| amd64
+| Windows Server 2022
+| Requires Windows host with containers enabled.
+|===
+
+NOTE: Linux containers work on any Docker host (Linux, macOS via Docker
+Desktop, WSL2). Windows containers require a Windows host running in Windows
+Containers mode.
+
+On **Apple Silicon** (M1/M2/M3/M4) Macs, Docker Desktop pulls the `arm64`
+variant automatically. On **Intel** Macs and most Linux servers, the `amd64`
+variant is used.
+
+The `arm64` Linux image runs eep (x86-64 only) via QEMU user-mode emulation.
+This is transparent — no extra setup is needed.
+
+
+== Running the container
+
+=== Linux / macOS
+
+Pull and run interactively:
+
+[source,bash]
+----
+docker pull ghcr.io/metanorma/suma-docker:latest
+docker run -it --rm ghcr.io/metanorma/suma-docker:latest
+----
+
+To build ISO 10303 documents, mount the source repository:
+
+[source,bash]
+----
+docker run -it --rm \
+  -v $(pwd):/metanorma \
+  ghcr.io/metanorma/suma-docker:latest \
+  suma build metanorma-single.yml
+----
+
+Using the Makefile from the
+https://github.com/metanorma/iso-10303[iso-10303] repository:
+
+[source,bash]
+----
+# Build a single part
+make event docker
+
+# Build with a specific suma-docker tag
+docker run -it --rm -v $(pwd):/metanorma ghcr.io/metanorma/suma-docker:1.0.0 \
+  suma build metanorma-single.yml
+----
+
+=== Windows
+
+NOTE: Windows containers require switching Docker Desktop to "Windows
+Containers" mode (or running on a Windows Server with container support).
+
+Pull and run:
+
+[source,powershell]
+----
+docker pull ghcr.io/metanorma/suma-docker:windows-ltsc2025
+docker run -it --rm ghcr.io/metanorma/suma-docker:windows-ltsc2025
+----
+
+To build ISO 10303 documents, mount the source repository:
+
+[source,powershell]
+----
+docker run -it --rm -v C:\iso-10303:C:\metanorma ghcr.io/metanorma/suma-docker:windows-ltsc2025 suma build metanorma-single.yml
+----
+
+For Windows Server 2022 hosts, use the `windows-ltsc2022` tag. The `windows`
+manifest tag points to the latest ltsc2025 build.
+
+
+== Building the container locally
+
+=== Linux
+
+[source,bash]
+----
+docker build -t suma:latest .
+----
+
+=== Windows
+
+[source,bash]
+----
+docker build -t suma:windows -f Dockerfile.windows .
+----
+
+To override the base image (e.g. to test against a specific metanorma version):
+
+[source,bash]
+----
+docker build -t suma:test --build-arg BASE_IMAGE=metanorma/metanorma:windows-ltsc2022-1.15.7 -f Dockerfile.windows .
+----
+
+
+== Version mapping
+
+The suma-docker container builds on top of the
+https://github.com/metanorma/metanorma-docker[metanorma-docker] container.
+This table shows which metanorma-docker version each suma-docker version is
+based on, by platform.
+
+[cols="1,1,2,2"]
+|===
+| suma-docker version | Platform | metanorma-docker version | Base image
+
+| 0.1.0 | linux/amd64 | 1.15.7 | `metanorma/metanorma:1.15.7` (ruby/bookworm)
+| 0.1.0 | linux/arm64 | 1.15.7 | `metanorma/metanorma:1.15.7` (ruby/bookworm)
+| 0.1.0 | windows-ltsc2025 | 1.15.7 | `metanorma/metanorma:windows-ltsc2025-1.15.7`
+| 0.1.0 | windows-ltsc2022 | 1.15.7 | `metanorma/metanorma:windows-ltsc2022-1.15.7`
+|===
+
+
+== Included tools
+
+In addition to the full metanorma toolchain from the base image,
+this container includes:
+
+* **SUMA** — STEP Unified Metanorma Architecture
+* **stepmod-utils** — STEP module utilities
+* **eengine** — EXPRESS schema engine (v5.2.7)
+* **eep** — EXPRESS processor
+
+
+== Copyright and license
+
+Copyright Ribose.
+
+This project is licensed under the MIT License. See the LICENSE file for details.
