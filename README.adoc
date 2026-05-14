@@ -7,19 +7,15 @@ image:https://img.shields.io/docker/image-size/metanorma/metanorma/1.15.7?label=
 
 == Purpose
 
-This repository is for publishing a Docker container that provides
-SUMA and the tools needed to build ISO 10303 from source.
+This repository publishes a Docker container that provides
+https://github.com/metanorma/suma[SUMA] (STEP Unified Model-driven Architecture)
+and all tools needed to build
+https://github.com/metanorma/iso-10303[ISO 10303] from source.
 
-The source for ISO 10303 is available at:
-
-* Official ISO BitBucket: https://sd.iso.org/bitbucket-pilot/projects/ISOTC184SC4/repos/wg12-step/
-* Metanorma GitHub mirror: https://github.com/metanorma/iso-10303
-
+The container is published on GitHub Container Registry (GHCR) at
+`ghcr.io/metanorma/suma-docker`.
 
 == Supported platforms
-
-The container is published as a multi-architecture image on GitHub Container
-Registry (GHCR) at `ghcr.io/metanorma/suma-docker`.
 
 [cols="1,1,1,2,3"]
 |===
@@ -68,39 +64,166 @@ The `arm64` Linux image runs eep (x86-64 only) via QEMU user-mode emulation.
 This is transparent — no extra setup is needed.
 
 
-== Running the container
+== Quick start
 
-=== Linux / macOS
-
-Pull and run interactively:
+Pull the image and build an ISO 10303 collection:
 
 [source,bash]
 ----
 docker pull ghcr.io/metanorma/suma-docker:latest
-docker run -it --rm ghcr.io/metanorma/suma-docker:latest
+docker run -it --rm -v $PWD:/metanorma ghcr.io/metanorma/suma-docker:latest \
+  suma build metanorma.yml
 ----
 
-To build ISO 10303 documents, mount the source repository:
+Output is written to `_site/` in the mounted directory.
+
+
+== Included tools
+
+The container provides the following commands, all available on `PATH`:
+
+[cols="1,3,1"]
+|===
+| Command | Description | Source
+
+| `suma`
+| STEP Unified Model-driven Architecture — builds ISO 10303 collections, exports/compares EXPRESS schemas, validates links
+| https://github.com/metanorma/suma[suma gem]
+
+| `metanorma`
+| Metanorma document compilation (AsciiDoc → XML/HTML/PDF)
+| https://github.com/metanorma/metanorma[metanorma gem]
+
+| `eengine`
+| EXPRESS schema engine — used for schema comparison
+| https://github.com/expresslang/eengine-releases[eengine]
+
+| `eep`
+| Eurostep EXPRESS Parser
+| https://github.com/expresslang/eep-releases[eep]
+|===
+
+
+== Running the container
+
+=== Build an ISO 10303 collection
+
+The primary use case is building ISO 10303 document collections with
+`suma build`. Mount the
+https://github.com/metanorma/iso-10303[iso-10303] repository as `/metanorma`:
 
 [source,bash]
 ----
-docker run -it --rm \
-  -v $(pwd):/metanorma \
-  ghcr.io/metanorma/suma-docker:latest \
-  suma build metanorma-single.yml
+docker run -it --rm -v $PWD:/metanorma ghcr.io/metanorma/suma-docker:latest \
+  suma build metanorma.yml
 ----
 
-Using the Makefile from the
-https://github.com/metanorma/iso-10303[iso-10303] repository:
+The output appears in `_site/` inside the mounted directory.
+
+Common site manifests in the iso-10303 repository:
+
+[cols="2,4"]
+|===
+| Manifest | Description
+
+| `metanorma.yml`
+| Full collection
+
+| `metanorma-srl.yml`
+| STEP Resource Library (SRL)
+
+| `metanorma-smrl-all.yml`
+| Schema Model Reference Library (all)
+
+| `metanorma-smol.yml`
+| Small test collection (parts 41–43)
+
+| `metanorma-single.yml`
+| Single-part build (set `ROOT` variable)
+|===
+
+.Build options:
+
+`--[no-]compile`:: Compile or skip compilation (default: true)
+`--schemas-all-path=PATH`, `-s PATH`:: Generate a file listing all schemas in the collection
+
+[source,bash]
+----
+# Build without compilation (generates schema listing only)
+docker run -it --rm -v $PWD:/metanorma ghcr.io/metanorma/suma-docker:latest \
+  suma build --no-compile metanorma-srl.yml
+----
+
+=== Using the Makefile
+
+The iso-10303 repository includes a Makefile with Docker support.
+Append `docker` to any build target to run it inside the container:
 
 [source,bash]
 ----
 # Build a single part
 make event docker
 
-# Build with a specific suma-docker tag
-docker run -it --rm -v $(pwd):/metanorma ghcr.io/metanorma/suma-docker:1.0.0 \
-  suma build metanorma-single.yml
+# Build the SRL
+make srl docker
+
+# Build with a specific image tag
+make srl docker IMAGE=ghcr.io/metanorma/suma-docker:1.0.0
+----
+
+=== Export EXPRESS schemas
+
+[source,bash]
+----
+# Export all schemas from a manifest
+docker run -it --rm -v $PWD:/metanorma ghcr.io/metanorma/suma-docker:latest \
+  suma export -o express-files schemas-srl.yml
+
+# Export with annotations and ZIP archive
+docker run -it --rm -v $PWD:/metanorma ghcr.io/metanorma/suma-docker:latest \
+  suma export -o express-files --annotations --zip schemas-srl.yml
+----
+
+=== Compare schema versions
+
+[source,bash]
+----
+docker run -it --rm -v $PWD:/metanorma ghcr.io/metanorma/suma-docker:latest \
+  suma compare schemas/new/action_schema.exp schemas/old/action_schema.exp \
+    --version 2
+----
+
+=== Validate EXPRESS cross-reference links
+
+[source,bash]
+----
+docker run -it --rm -v $PWD:/metanorma ghcr.io/metanorma/suma-docker:latest \
+  suma validate links schemas-srl.yml documents validation_results.txt
+----
+
+=== Generate schema manifest
+
+[source,bash]
+----
+docker run -it --rm -v $PWD:/metanorma ghcr.io/metanorma/suma-docker:latest \
+  suma generate-schemas metanorma-smrl-all.yml schemas-smrl-all.yml
+----
+
+=== Run other tools directly
+
+[source,bash]
+----
+# Run eengine
+docker run -it --rm -v $PWD:/metanorma ghcr.io/metanorma/suma-docker:latest \
+  eengine --help
+
+# Run eep
+docker run -it --rm -v $PWD:/metanorma ghcr.io/metanorma/suma-docker:latest \
+  eep -h
+
+# Run metanorma directly
+docker run -it --rm -v $PWD:/metanorma ghcr.io/metanorma/suma-docker:latest \
+  metanorma document.adoc
 ----
 
 === Windows
@@ -108,23 +231,13 @@ docker run -it --rm -v $(pwd):/metanorma ghcr.io/metanorma/suma-docker:1.0.0 \
 NOTE: Windows containers require switching Docker Desktop to "Windows
 Containers" mode (or running on a Windows Server with container support).
 
-Pull and run:
-
 [source,powershell]
 ----
 docker pull ghcr.io/metanorma/suma-docker:windows-ltsc2025
-docker run -it --rm ghcr.io/metanorma/suma-docker:windows-ltsc2025
+docker run -it --rm -v C:\iso-10303:C:\metanorma ghcr.io/metanorma/suma-docker:windows-ltsc2025 suma build metanorma.yml
 ----
 
-To build ISO 10303 documents, mount the source repository:
-
-[source,powershell]
-----
-docker run -it --rm -v C:\iso-10303:C:\metanorma ghcr.io/metanorma/suma-docker:windows-ltsc2025 suma build metanorma-single.yml
-----
-
-For Windows Server 2022 hosts, use the `windows-ltsc2022` tag. The `windows`
-manifest tag points to the latest ltsc2025 build.
+For Windows Server 2022 hosts, use the `windows-ltsc2022` tag.
 
 
 == Building the container locally
@@ -167,17 +280,6 @@ based on, by platform.
 | 0.1.0 | windows-ltsc2025 | 1.15.7 | `metanorma/metanorma:windows-ltsc2025-1.15.7`
 | 0.1.0 | windows-ltsc2022 | 1.15.7 | `metanorma/metanorma:windows-ltsc2022-1.15.7`
 |===
-
-
-== Included tools
-
-In addition to the full metanorma toolchain from the base image,
-this container includes:
-
-* **SUMA** — STEP Unified Metanorma Architecture
-* **stepmod-utils** — STEP module utilities
-* **eengine** — EXPRESS schema engine (v5.2.7)
-* **eep** — EXPRESS processor
 
 
 == Copyright and license
