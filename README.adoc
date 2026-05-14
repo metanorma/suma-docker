@@ -66,16 +66,19 @@ This is transparent — no extra setup is needed.
 
 == Quick start
 
-Pull the image and build an ISO 10303 collection:
+Clone the https://github.com/metanorma/iso-10303[iso-10303] repository, then build a small test collection (parts 41–43):
 
 [source,bash]
 ----
+git clone https://github.com/metanorma/iso-10303.git
+cd iso-10303
+
 docker pull ghcr.io/metanorma/suma-docker:latest
 docker run -it --rm -v $PWD:/metanorma ghcr.io/metanorma/suma-docker:latest \
-  suma build metanorma.yml
+  suma build metanorma-smol.yml
 ----
 
-Output is written to `_site/` in the mounted directory.
+Output is written to `_site/` in the mounted directory. Open `_site/document.1.xml.0.html` to view the result.
 
 
 == Included tools
