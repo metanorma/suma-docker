@@ -19,6 +19,7 @@ collection-pattern.yml
 # Ruby
 .bundle/
 vendor/
+.ruby-lsp/
 
 # OS
 .DS_Store

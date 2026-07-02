@@ -1,11 +1,7 @@
-FROM metanorma/metanorma:1.15.7
+FROM metanorma/metanorma:1.16.6
 LABEL maintainer="Metanorma Team <metanorma@ribose.com>"
 
 ARG EENGINE_VERSION=5.2.7
-
-# Install SUMA and dependencies using the repo's Gemfile.lock for reproducibility
-COPY Gemfile Gemfile.lock ./
-RUN bundle install
 
 RUN ARCH=$(uname -m) && \
     if [ "$ARCH" = "x86_64" ]; then \
