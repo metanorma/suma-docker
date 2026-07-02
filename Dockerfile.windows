@@ -1,31 +1,7 @@
-ARG BASE_IMAGE=metanorma/metanorma:windows-ltsc2025-1.15.7
-ARG BUILDER_IMAGE=mcr.microsoft.com/windows/servercore:ltsc2025
+ARG BASE_IMAGE=metanorma/metanorma:windows-ltsc2025-1.16.6
 ARG EENGINE_VERSION=5.2.7
 
-# Builder stage: install additional gems on a clean Windows image where
-# Ruby networking works (the metanorma runner image has ENOTSOCK issues).
-FROM ${BUILDER_IMAGE} AS builder
-
-RUN powershell -Command \
-      "Set-ExecutionPolicy Bypass -Scope Process -Force; \
-       [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; \
-       Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))"
-
-RUN choco install -y ruby --version=3.4.5.1
-RUN choco install -y msys2
-
-RUN setx PATH "%PATH%;C:\tools\msys64\usr\bin;C:\tools\ruby34\bin"
-
-RUN C:\tools\msys64\usr\bin\bash -lc "pacman --noconfirm -Syuu"
-RUN C:\tools\msys64\usr\bin\bash -lc "pacman --noconfirm -S base-devel mingw-w64-x86_64-toolchain mingw-w64-x86_64-libyaml"
-
-RUN gem install suma stepmod-utils --install-dir C:\extra-gems --no-document
-
-# Runner stage: metanorma base image + extra gems + EXPRESS tools
 FROM ${BASE_IMAGE}
-
-# Copy additional gems into the metanorma Ruby installation
-COPY --from=builder C:/extra-gems C:/tools/ruby34/lib/ruby/gems/3.4.0
 
 # Install eengine (Windows x86-64)
 RUN powershell -Command \

@@ -3,14 +3,15 @@
 image:https://img.shields.io/github/v/tag/metanorma/suma-docker?label=version&sort=semver[Version]
 image:https://img.shields.io/github/actions/workflow/status/metanorma/suma-docker/build-push.yml?branch=main[Build Status]
 image:https://img.shields.io/badge/ghcr-metanorma%2Fsuma--docker-blue[GHCR]
-image:https://img.shields.io/docker/image-size/metanorma/metanorma/1.15.7?label=base%20image%20size[Base Image Size]
+image:https://img.shields.io/docker/image-size/metanorma/metanorma/1.16.6?label=base%20image%20size[Base Image Size]
 
 == Purpose
 
-This repository publishes a Docker container that provides
-https://github.com/metanorma/suma[SUMA] (STEP Unified Model-driven Architecture)
-and all tools needed to build
-https://github.com/metanorma/iso-10303[ISO 10303] from source.
+This repository publishes a Docker container that adds EXPRESS schema tooling
+(`eengine` and `eep`) on top of the
+https://github.com/metanorma/metanorma-docker[metanorma-docker] image. SUMA
+(STEP Unified Model-driven Architecture) ships with the `metanorma` gem and is
+therefore already present in the base image; this repo installs no gems.
 
 The container is published on GitHub Container Registry (GHCR) at
 `ghcr.io/metanorma/suma-docker`.
@@ -91,19 +92,19 @@ The container provides the following commands, all available on `PATH`:
 
 | `suma`
 | STEP Unified Model-driven Architecture — builds ISO 10303 collections, exports/compares EXPRESS schemas, validates links
-| https://github.com/metanorma/suma[suma gem]
+| https://github.com/metanorma/metanorma[metanorma gem] (bundled in base image)
 
 | `metanorma`
 | Metanorma document compilation (AsciiDoc → XML/HTML/PDF)
-| https://github.com/metanorma/metanorma[metanorma gem]
+| https://github.com/metanorma/metanorma[metanorma gem] (base image)
 
 | `eengine`
 | EXPRESS schema engine — used for schema comparison
-| https://github.com/expresslang/eengine-releases[eengine]
+| https://github.com/expresslang/eengine-releases[eengine] (installed by this image)
 
 | `eep`
 | Eurostep EXPRESS Parser
-| https://github.com/expresslang/eep-releases[eep]
+| https://github.com/expresslang/eep-releases[eep] (installed by this image)
 |===
 
 
@@ -263,7 +264,7 @@ To override the base image (e.g. to test against a specific metanorma version):
 
 [source,bash]
 ----
-docker build -t suma:test --build-arg BASE_IMAGE=metanorma/metanorma:windows-ltsc2022-1.15.7 -f Dockerfile.windows .
+docker build -t suma:test --build-arg BASE_IMAGE=metanorma/metanorma:windows-ltsc2022-1.16.6 -f Dockerfile.windows .
 ----
 
 
@@ -278,10 +279,10 @@ based on, by platform.
 |===
 | suma-docker version | Platform | metanorma-docker version | Base image
 
-| 0.1.0 | linux/amd64 | 1.15.7 | `metanorma/metanorma:1.15.7` (ruby/bookworm)
-| 0.1.0 | linux/arm64 | 1.15.7 | `metanorma/metanorma:1.15.7` (ruby/bookworm)
-| 0.1.0 | windows-ltsc2025 | 1.15.7 | `metanorma/metanorma:windows-ltsc2025-1.15.7`
-| 0.1.0 | windows-ltsc2022 | 1.15.7 | `metanorma/metanorma:windows-ltsc2022-1.15.7`
+| 0.1.0 | linux/amd64 | 1.16.6 | `metanorma/metanorma:1.16.6` (ruby/bookworm)
+| 0.1.0 | linux/arm64 | 1.16.6 | `metanorma/metanorma:1.16.6` (ruby/bookworm)
+| 0.1.0 | windows-ltsc2025 | 1.16.6 | `metanorma/metanorma:windows-ltsc2025-1.16.6`
+| 0.1.0 | windows-ltsc2022 | 1.16.6 | `metanorma/metanorma:windows-ltsc2022-1.16.6`
 |===
 
 

@@ -8,16 +8,12 @@ on:
     paths:
       - 'Dockerfile'
       - 'Dockerfile.windows'
-      - 'Gemfile'
-      - 'Gemfile.lock'
       - 'VERSION'
       - '.github/workflows/build-push.yml'
   pull_request:
     paths:
       - 'Dockerfile'
       - 'Dockerfile.windows'
-      - 'Gemfile'
-      - 'Gemfile.lock'
       - 'VERSION'
       - '.github/workflows/build-push.yml'
   workflow_dispatch:
@@ -139,11 +135,11 @@ jobs:
   #       root_image:
   #         - os: windows-2025
   #           id: ltsc2025
-  #           base_image: metanorma/metanorma:windows-ltsc2025-1.15.7
+  #           base_image: metanorma/metanorma:windows-ltsc2025-1.16.6
   #           builder_image: mcr.microsoft.com/windows/servercore:ltsc2025
   #         - os: windows-2022
   #           id: ltsc2022
-  #           base_image: metanorma/metanorma:windows-ltsc2022-1.15.7
+  #           base_image: metanorma/metanorma:windows-ltsc2022-1.16.6
   #           builder_image: mcr.microsoft.com/windows/servercore:ltsc2022
   #   steps:
   #     - uses: actions/checkout@v4
@@ -186,11 +182,11 @@ jobs:
   #       root_image:
   #         - os: windows-2025
   #           id: ltsc2025
-  #           base_image: metanorma/metanorma:windows-ltsc2025-1.15.7
+  #           base_image: metanorma/metanorma:windows-ltsc2025-1.16.6
   #           builder_image: mcr.microsoft.com/windows/servercore:ltsc2025
   #         - os: windows-2022
   #           id: ltsc2022
-  #           base_image: metanorma/metanorma:windows-ltsc2022-1.15.7
+  #           base_image: metanorma/metanorma:windows-ltsc2022-1.16.6
   #           builder_image: mcr.microsoft.com/windows/servercore:ltsc2022
   #   steps:
   #     - uses: actions/checkout@v4

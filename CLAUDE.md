@@ -4,51 +4,134 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository Purpose
 
-Docker container for SUMA (STEP Unified Metanorma Architecture) and building ISO 10303 from source. Published as `ghcr.io/metanorma/suma-docker`.
+This repo publishes the Docker image `ghcr.io/metanorma/suma-docker`, which adds the
+EXPRESS schema tooling — `eengine` and `eep` — on top of the
+[metanorma-docker](https://github.com/metanorma/metanorma-docker) base image. SUMA
+itself ships with the `metanorma` gem and is therefore already present in the base
+image; this repo installs no gems and ships no `Gemfile`.
+
+The `Makefile`, `scripts/`, and `documents/` referenced by build targets are expected
+to live in the working directory at runtime (typically a checkout of the `iso-10303`
+repo) — not in this repo. The Makefile is the canonical build orchestrator that gets
+re-used by downstream ISO 10303 builds.
 
 ## Build Commands
 
 ```bash
-# Build the Docker image locally
+# Build the Linux image locally
 docker build -t suma:latest .
 
-# Update gems and rebuild image
+# Build the Windows image (requires a Windows host in Windows Containers mode)
+docker build -t suma:windows -f Dockerfile.windows .
+
+# Override the pinned base image (e.g. to test against another metanorma release)
+docker build -t suma:test --build-arg BASE_IMAGE=metanorma/metanorma:windows-ltsc2022-1.16.6 -f Dockerfile.windows .
+
+# Rebuild the local Docker image after pulling upstream changes
 make update docker
 
 # Run the container interactively
 docker run -it --rm ghcr.io/metanorma/suma-docker:latest
 ```
 
-## Architecture
+## Image Architecture
 
-The Dockerfile layers on `metanorma/metanorma:latest` and installs:
+Both Dockerfiles share the same purpose: take the metanorma base image and add
+`eengine` + `eep`. No gem installation happens in this repo.
 
-1. **SUMA** and **stepmod-utils** gems (via Bundler)
-2. **eengine** — EXPRESS schema engine binary, architecture-aware (x86-64 or arm64)
-3. **eep** — x86-64 only binary, runs on ARM64 via QEMU user-mode emulation
+### Linux `Dockerfile`
 
-The Makefile is a full build system for ISO 10303 document generation. Key build modes:
+Layers on `metanorma/metanorma:1.16.6` (pinned, not `latest`). Adds:
 
-- `make <part>` — build a single part (e.g., `make event`, `make 10303-47`)
-- `make srl` — build the Schema Reference Library (uses a git worktree from `develop`)
-- `make smrl` — build the Schema Model Reference Library
-- `make remote_feature ROOT=<module>` / `make local_feature ROOT=<module>` — build a feature module with dependencies
-- `make diff_collection BRANCH=<branch> REF=<base>` — build only documents that differ between branches
+1. **`eengine`** (EXPRESS schema engine) — architecture-aware: pulls `x86-64` or
+   `arm64` SBCL binary based on `uname -m`. Version pinned via `EENGINE_VERSION`
+   build-arg (currently `5.2.7`).
+2. **`eep`** (Eurostep EXPRESS Parser) — `x86-64` ELF binary. On `aarch64` hosts
+   the image installs `qemu-user-static`, `libc6:amd64`, and `binutils:amd64` so
+   the x86-64 eep binary runs transparently under QEMU user-mode emulation. No
+   setup is needed on Apple Silicon Macs.
 
-Append `docker` to any build target to run inside the container instead of locally (e.g., `make srl docker`).
+### `Dockerfile.windows`
+
+Single-stage build on `metanorma/metanorma:windows-ltsc2025-1.16.6`. Downloads
+`eengine.exe` and `eep.exe` into `C:\Windows` via PowerShell `Invoke-WebRequest`.
+
+Historically this Dockerfile used a separate `mcr.microsoft.com/windows/servercore`
+builder stage because gem installation hit ENOTSOCK errors in the runner image.
+With `suma` now bundled in the base `metanorma` gem, the builder stage is no
+longer needed.
+
+## Makefile Build System
+
+The Makefile is a full build system for ISO 10303 document generation. It detects
+the host OS (`linux` / `macos` / `windows`) and branches accordingly. Append
+`docker` to any target to run it inside the container instead of locally
+(e.g. `make srl docker`).
+
+Key targets:
+
+- `make <part>` — build a single part (e.g. `make event`, `make 10303-47`)
+- `make single-pattern '<glob>'` — build matching documents as a collection
+- `make srl` — Schema Reference Library. Creates a git worktree from `develop`
+  at `$HOME/work/wg12-step-build-srl` (override with `SRL_WORKTREE_BASE=...`),
+  copies uncommitted changes into it, builds, then runs
+  `scripts/suma2smrl.sh --publish --ci-repo ../wg12-ci`.
+- `make smrl` — Schema Model Reference Library (uses `metanorma-smrl-all.yml`)
+- `make remote_feature ROOT=<module>` / `make local_feature ROOT=<module>` —
+  build a feature module with dependencies. `local_feature` includes
+  uncommitted changes; `remote_feature` builds from HEAD only.
+- `make rebuild-feature` / `make rebuild-feature-quick` — re-run a feature
+  build. `quick` reuses the existing worktree and skips eengine.
+- `make diff_collection BRANCH=<branch> REF=<base>` — build only documents
+  that differ. `REF` defaults to `develop`.
+
+### Cross-worktree Gemfile pattern
+
+When the Makefile invokes `suma` inside a worktree (srl, feature, diff builds),
+it sets `BUNDLE_GEMFILE=$(CURDIR)/Gemfile` so the worktree uses CURDIR's locked
+gems. This refers to the **consumer repo's** Gemfile (e.g. iso-10303's), not
+this repo — this repo has no Gemfile. `make update` (without `docker`) runs
+`bundle update` against that same consumer Gemfile.
+
+### Feature build state files
+
+Feature builds track state in dotfiles at the repo root:
+`.feature-build-worktree`, `.feature-build-module`, `.feature-build-commit`.
+Diff builds use `.diff-build-worktree`. All are gitignored.
+
+### Post-processing modes
+
+`POSTPROCESS` controls the post-build step:
+
+- `rename` (default) — `scripts/rename_feature_docs.py` renames output to ISO
+  document format.
+- `smrl` — full SMRL conversion via `scripts/suma2smrl.sh`.
+
+### Python
+
+Makefile post-processing uses Python. If `~/venvs/wg12-step/bin/python3`
+exists it is used; otherwise it falls back to system `python3` (or `python`
+on Windows).
 
 ## CI/CD
 
-Version is tracked in the `VERSION` file (semver). Publishing workflow:
+Version is tracked in the `VERSION` file (semver, currently `0.1.0`).
 
-1. **release-tag** workflow (manual `workflow_dispatch`) — updates VERSION file and pushes a `v*` tag
-2. **build-push** workflow — triggers on push to main (publishes `latest` tag) and on `v*` tags (publishes versioned tags). Builds multi-platform (amd64/arm64) and pushes to GHCR only.
+- **build-push** workflow — triggers on push to `main` (publishes `latest`)
+  and on `v*` tags (publishes semver variants like `1.0`, `1`). Builds
+  multi-platform (`linux/amd64`, `linux/arm64`) via QEMU and pushes to GHCR
+  only. PRs trigger a validation-only build (no push). Path filters cover
+  `Dockerfile`, `Dockerfile.windows`, `VERSION`, and the workflow itself.
+- **release-tag** workflow (manual `workflow_dispatch`) — takes a semver
+  input, updates `VERSION`, commits, and pushes the `v*` tag. This is the
+  only way to cut a release.
 
-To release a new version: run the release-tag workflow with the desired version number.
+**Windows CI is currently disabled** — the `publish-windows`,
+`manifest-windows`, and `build-windows-pr` jobs are commented out in
+`.github/workflows/build-push.yml`. They were disabled due to Ruby SSL/socket
+issues that blocked `gem install` in the runner image. With `suma` now
+bundled in the base `metanorma` gem, that blocker no longer applies —
+re-enabling Windows CI is a viable follow-up.
 
-## Key Details
-
-- The Gemfile pins `connection_pool ~> 2.5` due to a SyntaxError in 3.x with Ruby 3.3.0
-- The Makefile scripts/ directory and documents/ directory are expected to exist in the working directory when using build targets — this repo is primarily the container definition
-- Feature builds use git worktrees and track state in `.feature-build-worktree`, `.feature-build-module`, `.feature-build-commit` files
-- Post-processing defaults to renaming (`POSTPROCESS=rename`), set `POSTPROCESS=smrl` for full SMRL conversion
+To release a new version: run the `release-tag` workflow with the desired
+semver number. Do not push tags manually.
