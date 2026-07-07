@@ -1,3 +1,13 @@
+# Manual version-bump workflow. Triggered via `gh workflow run release-tag.yml
+# --ref main -f next_version=X.Y.Z` (or the Actions UI). Bumps VERSION, commits
+# the change to main, tags v<next_version>, pushes. The tag push then triggers
+# build-push.yml which publishes the multi-arch image to ghcr.io.
+#
+# The equivalent manual fallback (if this workflow isn't dispatchable for any
+# reason) is:
+#   echo "X.Y.Z" > VERSION && git commit -am "Bump version to X.Y.Z" \
+#     && git tag vX.Y.Z && git push origin main --tags
+
 name: release-tag
 
 on:
