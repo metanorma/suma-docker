@@ -1,4 +1,4 @@
-ARG BASE_IMAGE=metanorma/metanorma:windows-ltsc2025-1.16.6
+ARG BASE_IMAGE=metanorma/metanorma:windows-ltsc2025-1.16.8
 ARG EENGINE_VERSION=5.2.7
 
 FROM ${BASE_IMAGE}
