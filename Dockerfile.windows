@@ -4,13 +4,15 @@ ARG EENGINE_VERSION=5.2.7
 FROM ${BASE_IMAGE}
 
 # Install eengine (Windows x86-64)
-RUN powershell -Command \
-      "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; \
-       Invoke-WebRequest -Uri 'https://github.com/expresslang/eengine-releases/releases/download/eeng-${EENGINE_VERSION}/eengine-${EENGINE_VERSION}-win-x86-64-sbcl.exe' -OutFile 'C:\Windows\eengine.exe'"
+# Using curl.exe rather than PowerShell Invoke-WebRequest because
+# Invoke-WebRequest in the Windows container's PowerShell hits sporadic
+# "connection was closed unexpectedly" errors against github.com that
+# don't reproduce with curl. curl.exe is built into Windows Server 2019+.
+RUN curl.exe -L --retry 5 --retry-delay 10 -o C:\Windows\eengine.exe \
+      "https://github.com/expresslang/eengine-releases/releases/download/eeng-${EENGINE_VERSION}/eengine-${EENGINE_VERSION}-win-x86-64-sbcl.exe"
 
 # Install eep (Windows x86)
-RUN powershell -Command \
-      "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; \
-       Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/expresslang/eep-releases/main/windows/eep-windows-x86.exe' -OutFile 'C:\Windows\eep.exe'"
+RUN curl.exe -L --retry 5 --retry-delay 10 -o C:\Windows\eep.exe \
+      "https://raw.githubusercontent.com/expresslang/eep-releases/main/windows/eep-windows-x86.exe"
 
 WORKDIR c:/metanorma
