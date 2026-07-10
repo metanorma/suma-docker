@@ -26,7 +26,15 @@ echo "  manifest:  ${MANIFEST}"
 echo
 
 echo "Cloning ${REPO} (ref=${REF}, shallow)..."
-git clone --depth=1 --branch "${REF}" "${REPO}" "${WORKDIR}/repo"
+# Use gh if available (respects GH_TOKEN for private repos in CI); fall
+# back to plain git clone for public repos / local runs without gh.
+if command -v gh >/dev/null 2>&1; then
+  REPO_NO_GIT="${REPO%.git}"
+  REPO_NO_GIT="${REPO_NO_GIT#https://github.com/}"
+  gh repo clone "${REPO_NO_GIT}" "${WORKDIR}/repo" -- --depth=1 --branch "${REF}"
+else
+  git clone --depth=1 --branch "${REF}" "${REPO}" "${WORKDIR}/repo"
+fi
 
 echo
 echo "Running: docker run ... suma build ${MANIFEST}"
