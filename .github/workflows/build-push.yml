@@ -115,11 +115,7 @@ jobs:
       - name: Smoke test
         run: ./tests/smoke.sh suma:smoke-test
 
-      - name: Integration test (suma build against iso-10303-smol)
-        # Non-gating: the smol build takes 60+ minutes, too long to block
-        # the publish on. Still runs and reports failures for investigation.
-        # Smoke test remains the publish gate.
-        continue-on-error: true
+      - name: Integration test (suma build --no-compile against iso-10303-smol)
         env:
           GH_TOKEN: ${{ secrets.METANORMA_CI_PAT_TOKEN }}
         run: ./tests/integration.sh suma:smoke-test
@@ -216,9 +212,9 @@ jobs:
       - name: Smoke test
         run: ./tests/smoke.sh suma:test
 
-      - name: Integration test (suma build against iso-10303-smol)
-        # Skip on PRs — the smol build takes ~30+ min and isn't worth
-        # blocking every PR on. Main pushes and tag pushes still run it.
+      - name: Integration test (suma build --no-compile against iso-10303-smol)
+        # Skip on PRs — even --no-compile takes a few minutes (mostly clone).
+        # Main pushes and tag pushes still run it.
         if: github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ secrets.METANORMA_CI_PAT_TOKEN }}
