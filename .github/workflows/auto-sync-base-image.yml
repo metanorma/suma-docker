@@ -1,0 +1,134 @@
+name: auto-sync-base-image
+
+# Polls the latest metanorma-docker release and opens a PR bumping the base
+# image pin when drift is detected. Runs daily off-peak, plus a manual trigger
+# for force-sync.
+#
+# Auth: uses METANORMA_CI_PAT_TOKEN so the opened PR triggers downstream
+# workflows (build-push validation). The default GITHUB_TOKEN would open the
+# PR but no workflows would fire on it, defeating the point.
+#
+# Behaviour:
+#   1. Read current base-image version from Dockerfile FROM line.
+#   2. Fetch latest non-prerelease from metanorma/metanorma-docker releases.
+#   3. Compare (sort -V); skip if current >= latest.
+#   4. Skip if an open PR for the same bump already exists.
+#   5. Otherwise: branch, bump Dockerfile + Dockerfile.windows + VERSION,
+#      push, open PR.
+
+on:
+  schedule:
+    - cron: '17 6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  check-and-sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.METANORMA_CI_PAT_TOKEN }}
+          fetch-depth: 0
+
+      - name: Detect current base-image version
+        id: current
+        run: |
+          CURRENT=$(grep -E '^FROM ' Dockerfile | head -1 | awk '{print $2}' | sed 's|^.*:||')
+          if [ -z "$CURRENT" ]; then
+            echo "Could not parse base image version from Dockerfile"
+            exit 1
+          fi
+          echo "version=${CURRENT}" >> "$GITHUB_OUTPUT"
+
+      - name: Fetch latest metanorma-docker release
+        id: latest
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG=$(gh api repos/metanorma/metanorma-docker/releases/latest --jq '.tag_name')
+          LATEST="${TAG#v}"
+          if [ -z "$LATEST" ]; then
+            echo "Could not fetch latest release from metanorma-docker"
+            exit 1
+          fi
+          echo "version=${LATEST}" >> "$GITHUB_OUTPUT"
+
+      - name: Compare versions
+        id: compare
+        run: |
+          CURRENT="${{ steps.current.outputs.version }}"
+          LATEST="${{ steps.latest.outputs.version }}"
+          echo "Current pin: ${CURRENT}"
+          echo "Latest published: ${LATEST}"
+          HIGHEST=$(printf '%s\n%s\n' "$CURRENT" "$LATEST" | sort -V | tail -1)
+          if [ "$LATEST" = "$CURRENT" ]; then
+            echo "Up to date."
+            echo "needs_sync=false" >> "$GITHUB_OUTPUT"
+          elif [ "$HIGHEST" != "$LATEST" ]; then
+            echo "Latest (${LATEST}) is older than current (${CURRENT}) — not downgrading."
+            echo "needs_sync=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "Drift detected."
+            echo "needs_sync=true" >> "$GITHUB_OUTPUT"
+            echo "new_version=${LATEST}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Check for existing open PR
+        if: steps.compare.outputs.needs_sync == 'true'
+        id: existing_pr
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          BRANCH="auto-sync/base-${{ steps.compare.outputs.new_version }}"
+          COUNT=$(gh pr list --head "$BRANCH" --state open --json number -q 'length' 2>/dev/null || echo 0)
+          echo "Open PRs on $BRANCH: $COUNT"
+          if [ "$COUNT" -gt 0 ]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Bump files
+        if: steps.compare.outputs.needs_sync == 'true' && steps.existing_pr.outputs.exists == 'false'
+        run: |
+          NEW="${{ steps.compare.outputs.new_version }}"
+          sed -i "s|^FROM metanorma/metanorma:.*|FROM metanorma/metanorma:${NEW}|" Dockerfile
+          sed -i "s|^ARG BASE_IMAGE=metanorma/metanorma:windows-ltsc2025-.*|ARG BASE_IMAGE=metanorma/metanorma:windows-ltsc2025-${NEW}|" Dockerfile.windows
+          echo "${NEW}" > VERSION
+
+      - name: Open pull request
+        if: steps.compare.outputs.needs_sync == 'true' && steps.existing_pr.outputs.exists == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.METANORMA_CI_PAT_TOKEN }}
+        run: |
+          NEW="${{ steps.compare.outputs.new_version }}"
+          CURRENT="${{ steps.current.outputs.version }}"
+          BRANCH="auto-sync/base-${NEW}"
+
+          git checkout -b "$BRANCH"
+          git config user.name "metanorma-ci"
+          git config user.email "metanorma-ci@users.noreply.github.com"
+          git add Dockerfile Dockerfile.windows VERSION
+          git commit -m "Bump base image to metanorma ${NEW}"
+          git push origin "$BRANCH"
+
+          {
+            echo "Detected that the base image has drifted from the latest metanorma-docker release."
+            echo ""
+            echo "- **Current pin:** \`${CURRENT}\`"
+            echo "- **Latest published:** \`${NEW}\`"
+            echo "- **Upstream release:** https://github.com/metanorma/metanorma-docker/releases/latest"
+            echo ""
+            echo "This PR was opened automatically by the \`auto-sync-base-image\` workflow."
+            echo "Review the upstream release notes (especially for major bumps) before merging."
+            echo "After merge, run the \`release-tag\` workflow with \`next_version=${NEW}\` to publish."
+          } > /tmp/pr-body.md
+
+          gh pr create \
+            --title "Bump base image to metanorma ${NEW}" \
+            --body-file /tmp/pr-body.md \
+            --head "$BRANCH"
