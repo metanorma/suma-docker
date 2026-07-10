@@ -3,6 +3,12 @@
 # the change to main, tags v<next_version>, pushes. The tag push then triggers
 # build-push.yml which publishes the multi-arch image to ghcr.io.
 #
+# Version scheme (aligned with metanorma-docker):
+#   X.Y.Z     — aligned with metanorma-docker X.Y.Z (e.g. 1.16.8)
+#   X.Y.Z.N   — N-th suma-specific patch on top of the same base (e.g. 1.16.8.1
+#               for an eengine bump or Dockerfile fix that doesn't change the
+#               base image)
+#
 # The equivalent manual fallback (if this workflow isn't dispatchable for any
 # reason) is:
 #   echo "X.Y.Z" > VERSION && git commit -am "Bump version to X.Y.Z" \
@@ -15,7 +21,7 @@ on:
     inputs:
       next_version:
         description: |
-          Next version (semver, e.g. 1.0.0)
+          Next version (X.Y.Z or X.Y.Z.N, e.g. 1.16.8 or 1.16.8.1)
         required: true
 
 jobs:
@@ -26,10 +32,10 @@ jobs:
         with:
           token: ${{ secrets.METANORMA_CI_PAT_TOKEN }}
 
-      - name: Validate semver
+      - name: Validate version format
         run: |
-          if [[ ! "${{ github.event.inputs.next_version }}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "Error: Version must be semver (e.g. 1.0.0)"
+          if [[ ! "${{ github.event.inputs.next_version }}" =~ ^[0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?$ ]]; then
+            echo "Error: Version must be X.Y.Z or X.Y.Z.N (e.g. 1.16.8 or 1.16.8.1)"
             exit 1
           fi
 

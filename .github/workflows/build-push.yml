@@ -31,14 +31,27 @@ jobs:
   job_info:
     runs-on: ubuntu-latest
     outputs:
-      version: ${{ steps.version.outputs.result }}
+      version: ${{ steps.version.outputs.version }}
+      major: ${{ steps.version.outputs.major }}
+      major_minor: ${{ steps.version.outputs.major_minor }}
+      major_minor_patch: ${{ steps.version.outputs.major_minor_patch }}
       head_tag: ${{ steps.check.outputs.head_tag }}
     steps:
       - uses: actions/checkout@v4
       - id: version
         run: |
           VERSION=$(cat VERSION 2>/dev/null || echo "0.0.0")
-          echo "result=${VERSION}" >> $GITHUB_OUTPUT
+          MAJOR=$(echo "$VERSION" | cut -d. -f1)
+          MINOR=$(echo "$VERSION" | cut -d. -f2)
+          PATCH=$(echo "$VERSION" | cut -d. -f3)
+          MAJOR_MINOR="${MAJOR}.${MINOR}"
+          MAJOR_MINOR_PATCH="${MAJOR}.${MINOR}.${PATCH}"
+          {
+            echo "version=${VERSION}"
+            echo "major=${MAJOR}"
+            echo "major_minor=${MAJOR_MINOR}"
+            echo "major_minor_patch=${MAJOR_MINOR_PATCH}"
+          } >> "$GITHUB_OUTPUT"
       - name: Retrieve tags
         run: git fetch --depth=1 origin +refs/tags/*:refs/tags/* || true
       - name: Set output variables
@@ -77,9 +90,10 @@ jobs:
             ghcr.io/metanorma/suma-docker
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=semver,pattern={{major}}
+            type=raw,value=${{ needs.job_info.outputs.version }},enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+            type=raw,value=${{ needs.job_info.outputs.major_minor_patch }},enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+            type=raw,value=${{ needs.job_info.outputs.major_minor }},enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+            type=raw,value=${{ needs.job_info.outputs.major }},enable=${{ startsWith(github.ref, 'refs/tags/v') }}
           labels: |
             org.opencontainers.image.vendor=Ribose Inc.
             org.opencontainers.image.licenses=MIT
