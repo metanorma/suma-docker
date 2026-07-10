@@ -32,6 +32,11 @@ make update docker
 
 # Run the container interactively
 docker run -it --rm ghcr.io/metanorma/suma-docker:latest
+
+# Run the test suite locally against a built image
+docker build -t suma:test .
+./tests/smoke.sh suma:test           # Linux smoke (binaries on PATH, --version)
+./tests/integration.sh suma:test     # Integration (suma generate-schemas on iso-10303-smol)
 ```
 
 ## Image Architecture
@@ -41,7 +46,7 @@ Both Dockerfiles share the same purpose: take the metanorma base image and add
 
 ### Linux `Dockerfile`
 
-Layers on `metanorma/metanorma:1.16.6` (pinned, not `latest`). Adds:
+Layers on `metanorma/metanorma:1.16.8` (pinned, not `latest`). Adds:
 
 1. **`eengine`** (EXPRESS schema engine) — architecture-aware: pulls `x86-64` or
    `arm64` SBCL binary based on `uname -m`. Version pinned via `EENGINE_VERSION`
@@ -54,12 +59,35 @@ Layers on `metanorma/metanorma:1.16.6` (pinned, not `latest`). Adds:
 ### `Dockerfile.windows`
 
 Single-stage build on `metanorma/metanorma:windows-ltsc2025-1.16.8`. Downloads
-`eengine.exe` and `eep.exe` into `C:\Windows` via PowerShell `Invoke-WebRequest`.
+`eengine.exe` and `eep.exe` into `C:\Windows` via `curl.exe`. (Earlier versions
+used PowerShell `Invoke-WebRequest`, but it sporadically hit TLS errors against
+github.com from inside the Windows container; `curl.exe` is more reliable and
+ships with Windows Server 2019+.)
 
 Historically this Dockerfile used a separate `mcr.microsoft.com/windows/servercore`
 builder stage because gem installation hit ENOTSOCK errors in the runner image.
 With `suma` now bundled in the base `metanorma` gem, the builder stage is no
 longer needed.
+
+## Test Suite (`tests/`)
+
+Four scripts, all executable, designed to run inside the built image via `docker run`:
+
+- **`tests/smoke.sh`** (Linux) — verifies `eengine`, `eep`, `metanorma`, `suma`
+  are on PATH and `metanorma`/`suma` respond to `--version`. Best-effort
+  invocation of `eengine`/`eep` with 5s timeouts.
+- **`tests/smoke.ps1`** (Windows) — PowerShell port of the above. Run via
+  `docker run --rm -v "$PWD\tests:C:\tests" <image> powershell -File C:\tests\smoke.ps1`.
+- **`tests/integration.sh`** (Linux) — clones `metanorma/iso-10303` (private;
+  uses `GH_TOKEN` env if set) and runs `suma generate-schemas metanorma-smol.yml`
+  to exercise the full suma parsing + eengine/eep pipeline without the slow
+  document compilation. Runs in ~15s on CI.
+
+CI gating (see `.github/workflows/build-push.yml`):
+- Linux PRs: `smoke.sh` only (fast feedback).
+- Linux main pushes: `smoke.sh` + `integration.sh` (full validation).
+- Linux tag pushes: `smoke.sh` + `integration.sh` gate the multi-arch publish.
+- Windows PRs/main/tag: `smoke.ps1` gates the build/publish.
 
 ## Makefile Build System
 
@@ -118,25 +146,58 @@ on Windows).
 Version is tracked in the `VERSION` file. Scheme is aligned with the upstream
 metanorma-docker tag:
 - `X.Y.Z` (e.g. `1.16.8`) — first release built on top of metanorma-docker `X.Y.Z`
-- `X.Y.Z.N` (e.g. `1.16.8.1`) — N-th suma-specific patch on top of the same base (eengine bump, Dockerfile fix, etc.)
+- `X.Y.Z.N` (e.g. `1.16.8.1`) — N-th suma-specific patch on top of the same base
+  (eengine bump, Dockerfile fix, etc.)
 
-- **build-push** workflow — triggers on push to `main` (publishes `latest`)
-  and on `v*` tags (publishes versioned tags: full `X.Y.Z[.N]`, then
-  `X.Y.Z`, `X.Y`, `X` rolling tags). Builds multi-platform (`linux/amd64`,
-  `linux/arm64`) via QEMU and pushes to GHCR only. PRs trigger a
-  validation-only build (no push). Path filters cover `Dockerfile`,
-  `Dockerfile.windows`, `VERSION`, and the workflow itself.
-- **release-tag** workflow (manual `workflow_dispatch`) — takes a version
-  input matching `X.Y.Z` or `X.Y.Z.N`, updates `VERSION`, commits, and
-  pushes the `v*` tag. This is the only way to cut a release.
+### Workflows
 
-**Windows CI is currently disabled** — the `publish-windows`,
-`manifest-windows`, and `build-windows-pr` jobs are commented out in
-`.github/workflows/build-push.yml`. They were disabled due to Ruby SSL/socket
-issues that blocked `gem install` in the runner image. With `suma` now
-bundled in the base `metanorma` gem, that blocker no longer applies —
-re-enabling Windows CI is a viable follow-up.
+- **`build-push.yml`** — the main pipeline.
+  - `publish-linux` (tag push only): builds amd64 image locally, runs
+    `tests/smoke.sh` + `tests/integration.sh`, then builds + pushes the
+    multi-arch (`linux/amd64`, `linux/arm64`) image to GHCR. Tags: `latest`,
+    `X.Y.Z[.N]`, `X.Y.Z`, `X.Y`, `X`.
+  - `publish-windows` (tag push only): matrix on `windows-ltsc2025` and
+    `windows-ltsc2022`; builds + pushes per-version tag, then `manifest-windows`
+    aggregates them under the bare `windows` tag. Each variant runs
+    `tests/smoke.ps1` before push.
+  - `release-notes` (tag push only, after publish-linux): creates a GitHub
+    Release with image metadata (base image, eengine version, source commit,
+    compare link).
+  - `build-linux-pr` (PR + main push): validation build + smoke test, no push.
+    On main push, also runs integration test.
+  - `build-windows-pr` (PR + main push): Windows validation build + smoke test.
 
-To release a new version: run the `release-tag` workflow with the desired
-version (`X.Y.Z` aligned with the base image, or `X.Y.Z.N` for a
-suma-specific patch). Do not push tags manually.
+- **`release-tag.yml`** (manual `workflow_dispatch`) — takes a version input
+  matching `X.Y.Z` or `X.Y.Z.N`, updates `VERSION`, commits (allow-empty), and
+  pushes the `v*` tag. This is the only way to cut a release. Auth via
+  `METANORMA_CI_PAT_TOKEN` (the `metanorma-ci` user is in the `ci` team which
+  has write access).
+
+- **`auto-sync-base-image.yml`** (daily cron + manual) — polls Docker Hub for
+  the latest `metanorma/metanorma:X.Y.Z` tag and, when drift is detected vs.
+  the `Dockerfile` FROM pin, opens a PR bumping `Dockerfile`,
+  `Dockerfile.windows`, and `VERSION`. Auth via `METANORMA_CI_PAT_TOKEN` so
+  the PR triggers downstream CI.
+
+### To release a new version
+
+Run the `release-tag` workflow with the desired version (`X.Y.Z` aligned with
+the base image, or `X.Y.Z.N` for a suma-specific patch). Do not push tags
+manually. The release-tag workflow will commit, tag, push, and the tag push
+triggers build-push.yml which publishes to GHCR + creates the GitHub Release.
+
+### Image traceability
+
+Each versioned tag has:
+- A GitHub Release (https://github.com/metanorma/suma-docker/releases) with
+  image metadata + compare link.
+- OCI labels on the image itself: `org.opencontainers.image.revision` (source
+  commit), `org.opencontainers.image.version`, etc. Inspect via
+  `docker inspect --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' <image>`.
+
+## Dependabot
+
+`.github/dependabot.yml` watches the `github-actions` and `docker` ecosystems,
+opening weekly PRs on Mondays. The `auto-sync-base-image.yml` workflow is the
+primary mechanism for base-image updates; Dependabot's `docker` entry is a
+backup.
