@@ -27,8 +27,8 @@ Write-Host "=== metanorma --version ==="
 metanorma --version
 
 Write-Host ""
-Write-Host "=== suma --version ==="
-suma --version 2>&1 | Select-Object -First 3 | ForEach-Object { Write-Host $_ }
+Write-Host "=== suma --help (first 3 lines) ==="
+suma --help 2>&1 | Select-Object -First 3 | ForEach-Object { Write-Host $_ }
 
 Write-Host ""
 Write-Host "Smoke test passed."

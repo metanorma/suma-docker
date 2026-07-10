@@ -21,8 +21,8 @@ docker run --rm "${IMAGE}" bash -c '
   echo "=== metanorma --version ==="
   metanorma --version
   echo
-  echo "=== suma --version ==="
-  suma --version 2>&1 | head -3
+  echo "=== suma --help (first 3 lines) ==="
+  suma --help 2>&1 | head -3
   echo
   echo "=== eengine --version (best-effort, 5s timeout) ==="
   timeout 5 eengine --version || timeout 5 eengine --help || echo "(no output)"
