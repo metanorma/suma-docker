@@ -135,3 +135,28 @@ re-enabling Windows CI is a viable follow-up.
 
 To release a new version: run the `release-tag` workflow with the desired
 semver number. Do not push tags manually.
+
+## Network access
+
+Cloud sessions and CI can reach `ghcr.io` only if the environment's network
+**egress policy** permits it. A normal in-repo `docker build` does **not** need
+`ghcr.io` — the base image comes from Docker Hub and the `eengine`/`eep`
+binaries come from `github.com`. Only *pulling* or *monitoring* the published
+`ghcr.io/metanorma/suma-docker` image touches GHCR.
+
+If a session is blocked from GHCR you'll see:
+
+```
+Error: Blocked by session's egress policy
+Proxy Response: 403 on CONNECT to ghcr.io:443
+```
+
+This is **not** something a repo change can fix — the block is enforced by the
+sandbox proxy and must be changed in the Claude Code environment settings:
+claude.ai/code → environment selector (the cloud icon) → the environment's
+overflow menu (`⋯`) → **Update cloud environment** → **Network access**. Choose
+**Custom** and add `ghcr.io` (leave *"Also include default list of common
+package managers"* checked), or choose **Full**. `ghcr.io` is nominally part of
+the default **Trusted** allowlist, but if a Trusted environment still returns a
+`403`, set it explicitly via Custom or Full. Network-policy changes apply to
+**new** sessions only, not the session that is already running.

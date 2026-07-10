@@ -65,6 +65,29 @@ The `arm64` Linux image runs eep (x86-64 only) via QEMU user-mode emulation.
 This is transparent — no extra setup is needed.
 
 
+== Network access
+
+Pulling and running the published image requires outbound HTTPS access to
+GitHub Container Registry:
+
+* `ghcr.io` — registry API and image manifests
+* GitHub blob hosts (`*.githubusercontent.com`, e.g.
+  `pkg-containers.githubusercontent.com`) — image layer downloads
+
+Building the image locally (see <<Building the container locally>>) additionally
+requires:
+
+* Docker Hub (`registry-1.docker.io`, `auth.docker.io`) — the
+  `metanorma/metanorma` base image
+* `github.com` and `raw.githubusercontent.com` — the `eengine` and `eep`
+  binaries
+
+In firewalled, allowlisted, or sandboxed CI environments these hosts must be
+permitted explicitly. If the registry is blocked, the pull fails with a
+`403` on `CONNECT to ghcr.io:443`; add `ghcr.io` (and the blob host) to the
+environment's egress allowlist to resolve it.
+
+
 == Quick start
 
 Clone the https://github.com/metanorma/iso-10303[iso-10303] repository, then build a small test collection (parts 41–43):
