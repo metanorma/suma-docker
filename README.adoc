@@ -268,6 +268,34 @@ docker build -t suma:test --build-arg BASE_IMAGE=metanorma/metanorma:windows-lts
 ----
 
 
+== Identifying what's in a published image
+
+Each published image carries OCI labels identifying the source commit and version. To inspect them:
+
+[source,bash]
+----
+docker inspect --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' \
+  ghcr.io/metanorma/suma-docker:latest
+----
+
+To dump every label:
+
+[source,bash]
+----
+docker inspect --format '{{ range $k, $v := .Config.Labels }}{{$k}}={{$v}}{{"\n"}}{{ end }}' \
+  ghcr.io/metanorma/suma-docker:latest
+----
+
+Each versioned tag (e.g. `v0.3.0`) also has a corresponding
+https://github.com/metanorma/suma-docker/releases[GitHub Release] listing
+the base image version, eengine version, source commit, and a compare link
+against the previous release. Use this to answer "what changed in image SHA `abc123`?":
+
+1. Look up the image digest on the GHCR package page or via `docker images --digests`.
+2. Find the digest in the https://github.com/metanorma/suma-docker/pkgs/container/suma-docker/versions[package versions list]; each entry shows the source commit and pushed-at timestamp.
+3. Match the commit to a https://github.com/metanorma/suma-docker/releases[release] (or browse the commit history directly).
+
+
 == Version mapping
 
 The suma-docker container builds on top of the
