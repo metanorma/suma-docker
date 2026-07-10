@@ -146,17 +146,18 @@ Common site manifests in the iso-10303 repository:
 | Single-part build (set `ROOT` variable)
 |===
 
-.Build options:
+.Building without compilation:
 
-`--[no-]compile`:: Compile or skip compilation (default: true)
-`--schemas-all-path=PATH`, `-s PATH`:: Generate a file listing all schemas in the collection
+`suma build` always compiles. To skip the slow document-compilation phase and only generate the schema manifest (useful for verifying that the collection parses and EXPRESS schemas process correctly), use `suma generate-schemas`:
 
 [source,bash]
 ----
-# Build without compilation (generates schema listing only)
+# Generate schema manifest only (no HTML/PDF output)
 docker run -it --rm -v $PWD:/metanorma ghcr.io/metanorma/suma-docker:latest \
-  suma build --no-compile metanorma-srl.yml
+  suma generate-schemas metanorma-srl.yml schemas-srl.yml
 ----
+
+For the full list of `suma` subcommands (`build`, `generate-schemas`, `export`, `compare`, `validate`, etc.), run `suma --help` inside the container.
 
 === Using the Makefile
 
