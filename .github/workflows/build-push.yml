@@ -9,12 +9,14 @@ on:
       - 'Dockerfile'
       - 'Dockerfile.windows'
       - 'VERSION'
+      - 'tests/**'
       - '.github/workflows/build-push.yml'
   pull_request:
     paths:
       - 'Dockerfile'
       - 'Dockerfile.windows'
       - 'VERSION'
+      - 'tests/**'
       - '.github/workflows/build-push.yml'
   workflow_dispatch:
 
@@ -111,27 +113,10 @@ jobs:
           tags: suma:smoke-test
 
       - name: Smoke test
-        run: |
-          docker run --rm suma:smoke-test bash -c '
-            set -e
-            echo "=== Checking binaries on PATH ==="
-            for cmd in eengine eep metanorma suma; do
-              command -v "$cmd" >/dev/null || { echo "MISSING: $cmd"; exit 1; }
-              echo "OK: $cmd -> $(command -v "$cmd")"
-            done
-            echo
-            echo "=== metanorma --version ==="
-            metanorma --version
-            echo
-            echo "=== suma --version ==="
-            suma --version 2>&1 | head -3
-            echo
-            echo "=== eengine --version (best-effort, 5s timeout) ==="
-            timeout 5 eengine --version || timeout 5 eengine --help || echo "(no output)"
-            echo
-            echo "=== eep --help (best-effort, 5s timeout) ==="
-            timeout 5 eep --help || timeout 5 eep -h || echo "(no output)"
-          '
+        run: ./tests/smoke.sh suma:smoke-test
+
+      - name: Integration test (suma build against iso-10303-smol)
+        run: ./tests/integration.sh suma:smoke-test
 
       - name: Build+push to GHCR
         uses: docker/build-push-action@v6
@@ -223,27 +208,10 @@ jobs:
           load: true
 
       - name: Smoke test
-        run: |
-          docker run --rm suma:test bash -c '
-            set -e
-            echo "=== Checking binaries on PATH ==="
-            for cmd in eengine eep metanorma suma; do
-              command -v "$cmd" >/dev/null || { echo "MISSING: $cmd"; exit 1; }
-              echo "OK: $cmd -> $(command -v "$cmd")"
-            done
-            echo
-            echo "=== metanorma --version ==="
-            metanorma --version
-            echo
-            echo "=== suma --version ==="
-            suma --version 2>&1 | head -3
-            echo
-            echo "=== eengine --version (best-effort, 5s timeout) ==="
-            timeout 5 eengine --version || timeout 5 eengine --help || echo "(no output)"
-            echo
-            echo "=== eep --help (best-effort, 5s timeout) ==="
-            timeout 5 eep --help || timeout 5 eep -h || echo "(no output)"
-          '
+        run: ./tests/smoke.sh suma:test
+
+      - name: Integration test (suma build against iso-10303-smol)
+        run: ./tests/integration.sh suma:test
 
   # Windows builds disabled — re-enable when Windows containers are needed.
   # Requires fixing Ruby SSL/socket issues in metanorma runner image.
