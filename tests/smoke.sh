@@ -24,6 +24,12 @@ docker run --rm "${IMAGE}" bash -c '
   echo "=== suma --version ==="
   suma --version 2>&1 | head -3
   echo
+  echo "=== suma --help (full) ==="
+  suma --help 2>&1 || true
+  echo
+  echo "=== suma build --help (full) ==="
+  suma build --help 2>&1 || true
+  echo
   echo "=== eengine --version (best-effort, 5s timeout) ==="
   timeout 5 eengine --version || timeout 5 eengine --help || echo "(no output)"
   echo
