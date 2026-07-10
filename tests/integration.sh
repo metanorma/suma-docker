@@ -1,18 +1,19 @@
 #!/usr/bin/env bash
-# Integration test: build a real ISO 10303 collection with `suma build`
-# inside the image and verify output. This is the test that catches
-# "the image starts but suma can't actually build anything" failures
-# that a pure smoke test misses.
+# Integration test: exercise suma's schema-generation pipeline against a
+# real ISO 10303 collection without doing the slow document compilation.
 #
-# Uses --no-compile by default: exercises collection parsing, manifest
-# generation, schema adoc generation (via eengine/eep), but skips the
-# slow document compilation (asciimath, relaton fetches, etc.) that
-# pushes the full smol build past 30+ minutes. Set SUMA_BUILD_ARGS to
-# override (e.g. SUMA_BUILD_ARGS="" for a full build).
+# We use `suma generate-schemas` rather than `suma build` because:
+#   - `suma build` has no flags to skip compilation (the README's
+#     `--no-compile` doesn't exist in current suma).
+#   - Full `suma build` of metanorma-smol.yml takes 30-60+ min (asciimath
+#     rendering of 1008 formulas + many relaton network fetches).
+#   - `suma generate-schemas` still exercises clone + suma CLI + eengine
+#     + eep processing of EXPRESS schemas, which catches the failure
+#     modes a smoke test misses.
 #
 # Usage: tests/integration.sh <image> [<repo-url>] [<ref>] [<manifest>]
 #
-# Defaults: clones metanorma/iso-10303@main and builds metanorma-smol.yml
+# Defaults: clones metanorma/iso-10303@main and processes metanorma-smol.yml
 # (the small test collection documented in this repo's README).
 set -euo pipefail
 
@@ -20,17 +21,15 @@ IMAGE="${1:?Usage: $0 <image> [<repo-url>] [<ref>] [<manifest>]}"
 REPO="${2:-https://github.com/metanorma/iso-10303.git}"
 REF="${3:-main}"
 MANIFEST="${4:-metanorma-smol.yml}"
-SUMA_BUILD_ARGS="${SUMA_BUILD_ARGS:---no-compile}"
 
 WORKDIR="$(mktemp -d)"
 trap 'rm -rf "$WORKDIR"' EXIT
 
 echo "Integration test:"
-echo "  image:         ${IMAGE}"
-echo "  repo:          ${REPO}"
-echo "  ref:           ${REF}"
-echo "  manifest:      ${MANIFEST}"
-echo "  suma build args: ${SUMA_BUILD_ARGS:-<none>}"
+echo "  image:     ${IMAGE}"
+echo "  repo:      ${REPO}"
+echo "  ref:       ${REF}"
+echo "  manifest:  ${MANIFEST}"
 echo
 
 echo "Cloning ${REPO} (ref=${REF}, shallow)..."
@@ -45,25 +44,21 @@ else
 fi
 
 echo
-echo "Running: docker run ... suma build ${SUMA_BUILD_ARGS} ${MANIFEST}"
-# shellcheck disable=SC2086
+echo "Running: docker run ... suma generate-schemas ${MANIFEST} /tmp/schemas-out.yml"
 docker run --rm -v "${WORKDIR}/repo:/metanorma" "${IMAGE}" \
-  suma build ${SUMA_BUILD_ARGS} "${MANIFEST}"
+  suma generate-schemas "${MANIFEST}" /metanorma/schemas-out.yml
 
 echo
 echo "Verifying output..."
-# --no-compile produces schema_docs/ but may not produce _site/.
-# Require at least one of them as evidence the build actually ran.
-if [ -d "${WORKDIR}/repo/_site" ]; then
-  HTML_FILES=$(find "${WORKDIR}/repo/_site" -name '*.html' | wc -l | tr -d ' ')
-  echo "  OK: _site/ exists (${HTML_FILES} HTML files)"
-elif [ -d "${WORKDIR}/repo/schema_docs" ]; then
-  SCHEMA_DOCS=$(find "${WORKDIR}/repo/schema_docs" -name '*.adoc' | wc -l | tr -d ' ')
-  echo "  OK: schema_docs/ exists (${SCHEMA_DOCS} generated adoc files)"
-else
-  echo "  FAIL: neither _site/ nor schema_docs/ was produced"
+test -f "${WORKDIR}/repo/schemas-out.yml"
+echo "  OK: schemas-out.yml exists"
+
+SCHEMA_ENTRIES=$(grep -c '^-' "${WORKDIR}/repo/schemas-out.yml" 2>/dev/null || echo 0)
+if [ "${SCHEMA_ENTRIES}" -lt 1 ]; then
+  echo "  FAIL: schemas-out.yml has no schema entries"
   exit 1
 fi
+echo "  OK: ${SCHEMA_ENTRIES} schema entries found in schemas-out.yml"
 
 echo
 echo "Integration test passed."
