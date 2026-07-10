@@ -116,6 +116,8 @@ jobs:
         run: ./tests/smoke.sh suma:smoke-test
 
       - name: Integration test (suma build against iso-10303-smol)
+        env:
+          GH_TOKEN: ${{ secrets.METANORMA_CI_PAT_TOKEN }}
         run: ./tests/integration.sh suma:smoke-test
 
       - name: Build+push to GHCR
@@ -211,6 +213,8 @@ jobs:
         run: ./tests/smoke.sh suma:test
 
       - name: Integration test (suma build against iso-10303-smol)
+        env:
+          GH_TOKEN: ${{ secrets.METANORMA_CI_PAT_TOKEN }}
         run: ./tests/integration.sh suma:test
 
   # Windows builds disabled — re-enable when Windows containers are needed.
