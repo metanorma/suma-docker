@@ -213,6 +213,9 @@ jobs:
         run: ./tests/smoke.sh suma:test
 
       - name: Integration test (suma build against iso-10303-smol)
+        # Skip on PRs — the smol build takes ~30+ min and isn't worth
+        # blocking every PR on. Main pushes and tag pushes still run it.
+        if: github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ secrets.METANORMA_CI_PAT_TOKEN }}
         run: ./tests/integration.sh suma:test
