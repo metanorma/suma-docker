@@ -44,15 +44,20 @@ jobs:
           fi
           echo "version=${CURRENT}" >> "$GITHUB_OUTPUT"
 
-      - name: Fetch latest metanorma-docker release
+      - name: Fetch latest metanorma-docker tag from Docker Hub
         id: latest
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          TAG=$(gh api repos/metanorma/metanorma-docker/releases/latest --jq '.tag_name')
-          LATEST="${TAG#v}"
+          # metanorma-docker's GitHub Releases stopped being maintained in
+          # 2021 (last entry v1.5.1). The canonical source of truth for
+          # published base-image versions is Docker Hub, where the plain
+          # `X.Y.Z` tag (e.g. `1.16.8`) tracks the latest stable release.
+          LATEST=$(curl -fsSL 'https://hub.docker.com/v2/repositories/metanorma/metanorma/tags/?page_size=100' \
+            | jq -r '.results[].name' \
+            | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' \
+            | sort -V \
+            | tail -1)
           if [ -z "$LATEST" ]; then
-            echo "Could not fetch latest release from metanorma-docker"
+            echo "Could not fetch latest tag from Docker Hub"
             exit 1
           fi
           echo "version=${LATEST}" >> "$GITHUB_OUTPUT"
