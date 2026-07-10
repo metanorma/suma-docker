@@ -1,0 +1,31 @@
+version: 2
+updates:
+  # Keep github-actions versions current (actions/checkout, docker/*-action, etc.)
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - github-actions
+    commit-message:
+      prefix: ci
+      include: scope
+
+  # Keep the base image digest current. The auto-sync-base-image workflow
+  # already handles major/minor base-image bumps via PRs; this entry just
+  # ensures Dependabot can also flag drift if the cron workflow breaks.
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 1
+    labels:
+      - dependencies
+      - dockerfile
+    commit-message:
+      prefix: dockerfile
+      include: scope
