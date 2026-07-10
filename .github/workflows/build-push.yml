@@ -116,6 +116,10 @@ jobs:
         run: ./tests/smoke.sh suma:smoke-test
 
       - name: Integration test (suma build against iso-10303-smol)
+        # Non-gating: the smol build takes 60+ minutes, too long to block
+        # the publish on. Still runs and reports failures for investigation.
+        # Smoke test remains the publish gate.
+        continue-on-error: true
         env:
           GH_TOKEN: ${{ secrets.METANORMA_CI_PAT_TOKEN }}
         run: ./tests/integration.sh suma:smoke-test
