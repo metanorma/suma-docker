@@ -221,76 +221,70 @@ jobs:
           GH_TOKEN: ${{ secrets.METANORMA_CI_PAT_TOKEN }}
         run: ./tests/integration.sh suma:test
 
-  # Windows builds disabled — re-enable when Windows containers are needed.
-  # Requires fixing Ruby SSL/socket issues in metanorma runner image.
-  #
-  # publish-windows:
-  #   name: Publish (windows-${{ matrix.root_image.id }})
-  #   runs-on: ${{ matrix.root_image.os }}
-  #   needs: job_info
-  #   if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
-  #   strategy:
-  #     fail-fast: false
-  #     matrix:
-  #       root_image:
-  #         - os: windows-2025
-  #           id: ltsc2025
-  #           base_image: metanorma/metanorma:windows-ltsc2025-1.16.6
-  #           builder_image: mcr.microsoft.com/windows/servercore:ltsc2025
-  #         - os: windows-2022
-  #           id: ltsc2022
-  #           base_image: metanorma/metanorma:windows-ltsc2022-1.16.6
-  #           builder_image: mcr.microsoft.com/windows/servercore:ltsc2022
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #     - uses: docker/login-action@v3
-  #       with:
-  #         registry: ghcr.io
-  #         username: ${{ github.actor }}
-  #         password: ${{ secrets.GITHUB_TOKEN }}
-  #     - name: Build and push
-  #       run: |
-  #         docker build --pull --no-cache -t ghcr.io/metanorma/suma-docker:windows-${{ matrix.root_image.id }} -f Dockerfile.windows --build-arg BASE_IMAGE=${{ matrix.root_image.base_image }} --build-arg BUILDER_IMAGE=${{ matrix.root_image.builder_image }} .
-  #         docker push ghcr.io/metanorma/suma-docker:windows-${{ matrix.root_image.id }}
-  #       shell: bash
-  #
-  # manifest-windows:
-  #   name: Windows manifest
-  #   runs-on: ubuntu-latest
-  #   needs: publish-windows
-  #   steps:
-  #     - uses: docker/login-action@v3
-  #       with:
-  #         registry: ghcr.io
-  #         username: ${{ github.actor }}
-  #         password: ${{ secrets.GITHUB_TOKEN }}
-  #     - name: Create and push manifest
-  #       uses: Noelware/docker-manifest-action@0.4.3
-  #       with:
-  #         inputs: ghcr.io/metanorma/suma-docker:windows
-  #         images: ghcr.io/metanorma/suma-docker:windows-ltsc2022,ghcr.io/metanorma/suma-docker:windows-ltsc2025
-  #         push: true
-  #
-  # build-windows-pr:
-  #   name: Validate build (windows-${{ matrix.root_image.id }})
-  #   runs-on: ${{ matrix.root_image.os }}
-  #   needs: job_info
-  #   if: github.event_name == 'pull_request'
-  #   strategy:
-  #     fail-fast: false
-  #     matrix:
-  #       root_image:
-  #         - os: windows-2025
-  #           id: ltsc2025
-  #           base_image: metanorma/metanorma:windows-ltsc2025-1.16.6
-  #           builder_image: mcr.microsoft.com/windows/servercore:ltsc2025
-  #         - os: windows-2022
-  #           id: ltsc2022
-  #           base_image: metanorma/metanorma:windows-ltsc2022-1.16.6
-  #           builder_image: mcr.microsoft.com/windows/servercore:ltsc2022
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #     - name: Build (no push)
-  #       run: |
-  #         docker build --pull --no-cache -t suma:test -f Dockerfile.windows --build-arg BASE_IMAGE=${{ matrix.root_image.base_image }} --build-arg BUILDER_IMAGE=${{ matrix.root_image.builder_image }} .
-  #       shell: bash
+  publish-windows:
+    name: Publish (windows-${{ matrix.root_image.id }})
+    runs-on: ${{ matrix.root_image.os }}
+    needs: job_info
+    if: startsWith(github.ref, 'refs/tags/v')
+    strategy:
+      fail-fast: false
+      matrix:
+        root_image:
+          - os: windows-2025
+            id: ltsc2025
+            base_image: metanorma/metanorma:windows-ltsc2025-1.16.8
+          - os: windows-2022
+            id: ltsc2022
+            base_image: metanorma/metanorma:windows-ltsc2022-1.16.8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and push
+        run: |
+          docker build --pull -t ghcr.io/metanorma/suma-docker:windows-${{ matrix.root_image.id }} -f Dockerfile.windows --build-arg BASE_IMAGE=${{ matrix.root_image.base_image }} .
+          docker push ghcr.io/metanorma/suma-docker:windows-${{ matrix.root_image.id }}
+        shell: bash
+
+  manifest-windows:
+    name: Windows manifest
+    runs-on: ubuntu-latest
+    needs: publish-windows
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Create and push manifest
+        uses: Noelware/docker-manifest-action@0.4.3
+        with:
+          inputs: ghcr.io/metanorma/suma-docker:windows
+          images: ghcr.io/metanorma/suma-docker:windows-ltsc2022,ghcr.io/metanorma/suma-docker:windows-ltsc2025
+          push: true
+
+  build-windows-pr:
+    name: Validate build (windows-${{ matrix.root_image.id }})
+    runs-on: ${{ matrix.root_image.os }}
+    needs: job_info
+    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
+    strategy:
+      fail-fast: false
+      matrix:
+        root_image:
+          - os: windows-2025
+            id: ltsc2025
+            base_image: metanorma/metanorma:windows-ltsc2025-1.16.8
+          - os: windows-2022
+            id: ltsc2022
+            base_image: metanorma/metanorma:windows-ltsc2022-1.16.8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build (no push)
+        run: |
+          docker build --pull -t suma:test -f Dockerfile.windows --build-arg BASE_IMAGE=${{ matrix.root_image.base_image }} .
+        shell: bash
