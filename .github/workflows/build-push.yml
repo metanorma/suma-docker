@@ -115,7 +115,7 @@ jobs:
       - name: Smoke test
         run: ./tests/smoke.sh suma:smoke-test
 
-      - name: Integration test (suma build --no-compile against iso-10303-smol)
+      - name: Integration test (suma generate-schemas against iso-10303-smol)
         env:
           GH_TOKEN: ${{ secrets.METANORMA_CI_PAT_TOKEN }}
         run: ./tests/integration.sh suma:smoke-test
@@ -212,9 +212,10 @@ jobs:
       - name: Smoke test
         run: ./tests/smoke.sh suma:test
 
-      - name: Integration test (suma build --no-compile against iso-10303-smol)
-        # Skip on PRs — even --no-compile takes a few minutes (mostly clone).
-        # Main pushes and tag pushes still run it.
+      - name: Integration test (suma generate-schemas against iso-10303-smol)
+        # Skip on PRs — the test does a full clone of iso-10303 (~3 min)
+        # which is too long for routine PR feedback. Main pushes and tag
+        # pushes still run it.
         if: github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ secrets.METANORMA_CI_PAT_TOKEN }}
