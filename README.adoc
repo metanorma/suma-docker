@@ -3,7 +3,7 @@
 image:https://img.shields.io/github/v/tag/metanorma/suma-docker?label=version&sort=semver[Version]
 image:https://img.shields.io/github/actions/workflow/status/metanorma/suma-docker/build-push.yml?branch=main[Build Status]
 image:https://img.shields.io/badge/ghcr-metanorma%2Fsuma--docker-blue[GHCR]
-image:https://img.shields.io/docker/image-size/metanorma/metanorma/1.16.6?label=base%20image%20size[Base Image Size]
+image:https://img.shields.io/docker/image-size/metanorma/metanorma/1.16.8?label=base%20image%20size[Base Image Size]
 
 == Purpose
 
@@ -28,11 +28,11 @@ The container is published on GitHub Container Registry (GHCR) at
 | Any Docker host
 | Multi-arch manifest. Default tag.
 
-| `1.0.0`, `1.0`, `1`
+| `1.16.8`, `1.16`, `1`
 | Linux
 | amd64, arm64
 | Any Docker host
-| Versioned releases (multi-arch manifest).
+| Versioned releases aligned with metanorma-docker (see <<_version_scheme>>).
 
 | `windows`
 | Windows
@@ -172,7 +172,7 @@ make event docker
 make srl docker
 
 # Build with a specific image tag
-make srl docker IMAGE=ghcr.io/metanorma/suma-docker:1.0.0
+make srl docker IMAGE=ghcr.io/metanorma/suma-docker:1.16.8
 ----
 
 === Export EXPRESS schemas
@@ -264,8 +264,37 @@ To override the base image (e.g. to test against a specific metanorma version):
 
 [source,bash]
 ----
-docker build -t suma:test --build-arg BASE_IMAGE=metanorma/metanorma:windows-ltsc2022-1.16.6 -f Dockerfile.windows .
+docker build -t suma:test --build-arg BASE_IMAGE=metanorma/metanorma:windows-ltsc2022-1.16.8 -f Dockerfile.windows .
 ----
+
+
+== Version scheme
+
+This image's tags are aligned with the upstream
+https://github.com/metanorma/metanorma-docker[metanorma-docker] version it is
+built on top of, plus an optional suma-specific patch number:
+
+[cols="1,4"]
+|===
+| Format | Meaning
+
+| `X.Y.Z`
+| First release built on top of metanorma-docker `X.Y.Z` (e.g. `1.16.8`).
+
+| `X.Y.Z.N`
+| N-th suma-specific patch on top of the same base image — e.g. an
+  eengine bump or Dockerfile fix that doesn't change the metanorma base
+  (e.g. `1.16.8.1`).
+|===
+
+The https://github.com/metanorma/suma-docker/pkgs/container/suma-docker[GHCR package page]
+shows the available tags. The following tags always point at the newest version
+meeting the constraint:
+
+- `latest` — newest build on `main`
+- `1` — newest `1.*`
+- `1.16` — newest `1.16.*`
+- `1.16.8` — newest `1.16.8` or `1.16.8.N`
 
 
 == Identifying what's in a published image
@@ -307,10 +336,10 @@ based on, by platform.
 |===
 | suma-docker version | Platform | metanorma-docker version | Base image
 
-| 0.1.0 | linux/amd64 | 1.16.6 | `metanorma/metanorma:1.16.6` (ruby/bookworm)
-| 0.1.0 | linux/arm64 | 1.16.6 | `metanorma/metanorma:1.16.6` (ruby/bookworm)
-| 0.1.0 | windows-ltsc2025 | 1.16.6 | `metanorma/metanorma:windows-ltsc2025-1.16.6`
-| 0.1.0 | windows-ltsc2022 | 1.16.6 | `metanorma/metanorma:windows-ltsc2022-1.16.6`
+| 1.16.8 | linux/amd64 | 1.16.8 | `metanorma/metanorma:1.16.8` (ruby/bookworm)
+| 1.16.8 | linux/arm64 | 1.16.8 | `metanorma/metanorma:1.16.8` (ruby/bookworm)
+| 1.16.8 | windows-ltsc2025 | 1.16.8 | `metanorma/metanorma:windows-ltsc2025-1.16.8`
+| 1.16.8 | windows-ltsc2022 | 1.16.8 | `metanorma/metanorma:windows-ltsc2022-1.16.8`
 |===
 
 

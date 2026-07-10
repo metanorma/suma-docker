@@ -25,7 +25,7 @@ docker build -t suma:latest .
 docker build -t suma:windows -f Dockerfile.windows .
 
 # Override the pinned base image (e.g. to test against another metanorma release)
-docker build -t suma:test --build-arg BASE_IMAGE=metanorma/metanorma:windows-ltsc2022-1.16.6 -f Dockerfile.windows .
+docker build -t suma:test --build-arg BASE_IMAGE=metanorma/metanorma:windows-ltsc2022-1.16.8 -f Dockerfile.windows .
 
 # Rebuild the local Docker image after pulling upstream changes
 make update docker
@@ -53,7 +53,7 @@ Layers on `metanorma/metanorma:1.16.6` (pinned, not `latest`). Adds:
 
 ### `Dockerfile.windows`
 
-Single-stage build on `metanorma/metanorma:windows-ltsc2025-1.16.6`. Downloads
+Single-stage build on `metanorma/metanorma:windows-ltsc2025-1.16.8`. Downloads
 `eengine.exe` and `eep.exe` into `C:\Windows` via PowerShell `Invoke-WebRequest`.
 
 Historically this Dockerfile used a separate `mcr.microsoft.com/windows/servercore`
@@ -115,16 +115,20 @@ on Windows).
 
 ## CI/CD
 
-Version is tracked in the `VERSION` file (semver, currently `0.1.0`).
+Version is tracked in the `VERSION` file. Scheme is aligned with the upstream
+metanorma-docker tag:
+- `X.Y.Z` (e.g. `1.16.8`) — first release built on top of metanorma-docker `X.Y.Z`
+- `X.Y.Z.N` (e.g. `1.16.8.1`) — N-th suma-specific patch on top of the same base (eengine bump, Dockerfile fix, etc.)
 
 - **build-push** workflow — triggers on push to `main` (publishes `latest`)
-  and on `v*` tags (publishes semver variants like `1.0`, `1`). Builds
-  multi-platform (`linux/amd64`, `linux/arm64`) via QEMU and pushes to GHCR
-  only. PRs trigger a validation-only build (no push). Path filters cover
-  `Dockerfile`, `Dockerfile.windows`, `VERSION`, and the workflow itself.
-- **release-tag** workflow (manual `workflow_dispatch`) — takes a semver
-  input, updates `VERSION`, commits, and pushes the `v*` tag. This is the
-  only way to cut a release.
+  and on `v*` tags (publishes versioned tags: full `X.Y.Z[.N]`, then
+  `X.Y.Z`, `X.Y`, `X` rolling tags). Builds multi-platform (`linux/amd64`,
+  `linux/arm64`) via QEMU and pushes to GHCR only. PRs trigger a
+  validation-only build (no push). Path filters cover `Dockerfile`,
+  `Dockerfile.windows`, `VERSION`, and the workflow itself.
+- **release-tag** workflow (manual `workflow_dispatch`) — takes a version
+  input matching `X.Y.Z` or `X.Y.Z.N`, updates `VERSION`, commits, and
+  pushes the `v*` tag. This is the only way to cut a release.
 
 **Windows CI is currently disabled** — the `publish-windows`,
 `manifest-windows`, and `build-windows-pr` jobs are commented out in
@@ -134,4 +138,5 @@ bundled in the base `metanorma` gem, that blocker no longer applies —
 re-enabling Windows CI is a viable follow-up.
 
 To release a new version: run the `release-tag` workflow with the desired
-semver number. Do not push tags manually.
+version (`X.Y.Z` aligned with the base image, or `X.Y.Z.N` for a
+suma-specific patch). Do not push tags manually.
