@@ -36,10 +36,13 @@ Get-Content $contract | ForEach-Object {
             Write-Host "OK: $rest -> $($p.Source)"
         }
         'succeeds' {
-            # Use cmd /c so native commands' exit codes are captured cleanly.
-            cmd /c $rest "`$null" 2>`$null | Out-Null
-            if ($LASTEXITCODE -ne 0) {
-                Write-Host "FAIL: command exited ${LASTEXITCODE}: $rest"
+            # Use Start-Process to fully detach stdout/stderr from PowerShell.
+            # Native commands (like metanorma) write deprecation warnings to
+            # stderr; PowerShell with ErrorActionPreference=Stop treats that
+            # as fatal. Redirecting both streams to NUL inside cmd avoids it.
+            $proc = Start-Process -FilePath "cmd" -ArgumentList "/c $rest >nul 2>nul" -NoNewWindow -Wait -PassThru
+            if ($proc.ExitCode -ne 0) {
+                Write-Host "FAIL: command exited $($proc.ExitCode): $rest"
                 exit 1
             }
             Write-Host "OK: $rest"
