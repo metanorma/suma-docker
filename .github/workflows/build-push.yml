@@ -10,6 +10,7 @@ on:
       - 'Dockerfile.windows'
       - 'VERSION'
       - 'tests/**'
+      - '.github/scripts/**'
       - '.github/workflows/build-push.yml'
   pull_request:
     paths:
@@ -17,6 +18,7 @@ on:
       - 'Dockerfile.windows'
       - 'VERSION'
       - 'tests/**'
+      - '.github/scripts/**'
       - '.github/workflows/build-push.yml'
   workflow_dispatch:
 
@@ -41,19 +43,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - id: version
-        run: |
-          VERSION=$(cat VERSION 2>/dev/null || echo "0.0.0")
-          MAJOR=$(echo "$VERSION" | cut -d. -f1)
-          MINOR=$(echo "$VERSION" | cut -d. -f2)
-          PATCH=$(echo "$VERSION" | cut -d. -f3)
-          MAJOR_MINOR="${MAJOR}.${MINOR}"
-          MAJOR_MINOR_PATCH="${MAJOR}.${MINOR}.${PATCH}"
-          {
-            echo "version=${VERSION}"
-            echo "major=${MAJOR}"
-            echo "major_minor=${MAJOR_MINOR}"
-            echo "major_minor_patch=${MAJOR_MINOR_PATCH}"
-          } >> "$GITHUB_OUTPUT"
+        run: .github/scripts/image-metadata.sh >> "$GITHUB_OUTPUT"
+      - name: Smoke test the metadata script
+        run: ./tests/test-image-metadata.sh
       - name: Retrieve tags
         run: git fetch --depth=1 origin +refs/tags/*:refs/tags/* || true
       - name: Set output variables
@@ -146,15 +138,10 @@ jobs:
       - name: Extract image metadata
         id: meta
         run: |
-          BASE_IMAGE=$(grep -E '^FROM ' Dockerfile | head -1 | awk '{print $2}')
-          EENGINE_VERSION=$(grep -E '^ARG EENGINE_VERSION' Dockerfile | head -1 | awk -F'=' '{print $2}')
-          VERSION=$(cat VERSION)
+          .github/scripts/image-metadata.sh >> "$GITHUB_OUTPUT"
           CUR_TAG="${GITHUB_REF#refs/tags/}"
           PREV_TAG=$(git describe --abbrev=0 --tags "${CUR_TAG}^" 2>/dev/null || echo "")
           {
-            echo "base_image=${BASE_IMAGE}"
-            echo "eengine_version=${EENGINE_VERSION}"
-            echo "version=${VERSION}"
             echo "cur_tag=${CUR_TAG}"
             echo "prev_tag=${PREV_TAG}"
           } >> "$GITHUB_OUTPUT"
@@ -167,7 +154,7 @@ jobs:
             echo "## Image metadata"
             echo ""
             echo "- **suma-docker version:** \`${{ steps.meta.outputs.version }}\`"
-            echo "- **Base image:** \`${{ steps.meta.outputs.base_image }}\`"
+            echo "- **Base image:** \`${{ steps.meta.outputs.linux_base_image }}\`"
             echo "- **eengine:** \`${{ steps.meta.outputs.eengine_version }}\`"
             echo "- **eep:** latest from [\`expresslang/eep-releases\`](https://github.com/expresslang/eep-releases)"
             echo "- **Source commit:** [\`${GITHUB_SHA:0:7}\`](https://github.com/${{ github.repository }}/commit/${GITHUB_SHA})"
