@@ -80,6 +80,33 @@ $(PATTERN_ARG_RAW):
 endif
 endif
 
+# suma-build: invoke `suma build MANIFEST` with OS detection + docker/local dispatch.
+#
+# The OS-branching + docker-vs-bundle fan-out was previously inlined in every
+# build target (single, single-pattern, srl, smrl, _run-feature,
+# rebuild-feature, rebuild-feature-quick, diff_collection) — ~25 lines of
+# near-duplicate branching per target. The dispatch now lives once at the
+# Make-file level (SUMA_BUILD_RUN); the macro is the per-target call site.
+#
+# Linux always uses `bundle exec` (matches the original Makefile; Linux users
+# run locally). macOS/Windows pick docker if 'docker' is in MAKECMDGOALS,
+# otherwise bundle exec. BUNDLE_GEMFILE points at $(CURDIR)/Gemfile so
+# worktree builds inherit the host repo's locked gems. Docker volume mount
+# is $$(pwd) AFTER cd, so workdir itself is mounted at /metanorma inside
+# the container.
+ifeq ($(OS_NAME),linux)
+  SUMA_BUILD_RUN = BUNDLE_GEMFILE=$(CURDIR)/Gemfile time bundle exec suma build
+else ifneq (,$(filter docker,$(MAKECMDGOALS)))
+  SUMA_BUILD_RUN = time docker run -it -v "$$(pwd):/metanorma" suma:latest suma build
+else
+  SUMA_BUILD_RUN = BUNDLE_GEMFILE=$(CURDIR)/Gemfile time bundle exec suma build
+endif
+
+# Args: $(1) manifest filename, $(2) working directory expression, $(3) log filename.
+define suma-build
+	cd $(2) && $(SUMA_BUILD_RUN) $(1) 2>&1 | tee $(3)
+endef
+
 help:
 	@echo "$$HELP_MESSAGE"
 
@@ -120,30 +147,7 @@ ifeq ($(DO_MAKE-SINGLE-POWERSHELL),yes)
 	$(MAKE) MAKE-SINGLE-POWERSHELL ID=$@
 endif
 #suma build
-ifeq ($(OS_NAME),macos)
-ifneq (,$(filter docker,$(MAKECMDGOALS)))
-	@echo "macOS + docker target detected"
-	time docker run -it -v '${CURDIR}:/metanorma' suma:latest suma build metanorma-single.yml 2>&1 | tee metanorma-single-log.txt
-else
-	@echo "macOS detected"
-	time bundle exec suma build metanorma-single.yml 2>&1 | tee metanorma-single-log.txt
-endif
-endif
-
-ifeq ($(OS_NAME),linux)
-	@echo "linux detected"
-	time bundle exec suma build metanorma-single.yml 2>&1 | tee metanorma-single-log.txt
-endif
-
-ifeq ($(OS_NAME),windows)
-ifneq (,$(filter docker,$(MAKECMDGOALS)))
-	@echo "windows + docker target detected"
-	time docker run -it -v '${CURDIR}:/metanorma' suma:latest suma build metanorma-single.yml 2>&1 | tee metanorma-single-log.txt
-else
-	@echo "windows detected"
-	time bundle exec suma build metanorma-single.yml 2>&1 | tee metanorma-single-log.txt
-endif
-endif
+	$(call suma-build,metanorma-single.yml,$(CURDIR),metanorma-single-log.txt)
 	@echo ""
 	@echo "Post-processing index.html..."
 	@$(PYTHON) $(CURDIR)/scripts/rename_feature_docs.py $(CURDIR)/_site
@@ -205,28 +209,7 @@ endif
 ifeq ($(DO_MAKE-SINGLE-POWERSHELL),yes)
 	powershell -ExecutionPolicy Bypass -File scripts/single-pattern-build.ps1 -Pattern $(PATTERN_ARG)
 endif
-ifeq ($(OS_NAME),macos)
-ifneq (,$(filter docker,$(MAKECMDGOALS)))
-	@echo "macOS + docker target detected"
-	time docker run -it -v '${CURDIR}:/metanorma' suma:latest suma build metanorma-pattern.yml 2>&1 | tee metanorma-pattern-log.txt
-else
-	@echo "macOS detected"
-	time bundle exec suma build metanorma-pattern.yml 2>&1 | tee metanorma-pattern-log.txt
-endif
-endif
-ifeq ($(OS_NAME),linux)
-	@echo "linux detected"
-	time bundle exec suma build metanorma-pattern.yml 2>&1 | tee metanorma-pattern-log.txt
-endif
-ifeq ($(OS_NAME),windows)
-ifneq (,$(filter docker,$(MAKECMDGOALS)))
-	@echo "windows + docker target detected"
-	time docker run -it -v '${CURDIR}:/metanorma' suma:latest suma build metanorma-pattern.yml 2>&1 | tee metanorma-pattern-log.txt
-else
-	@echo "windows detected"
-	time bundle exec suma build metanorma-pattern.yml 2>&1 | tee metanorma-pattern-log.txt
-endif
-endif
+	$(call suma-build,metanorma-pattern.yml,$(CURDIR),metanorma-pattern-log.txt)
 	@echo ""
 	@echo "Post-processing index.html..."
 	@$(PYTHON) $(CURDIR)/scripts/rename_feature_docs.py $(CURDIR)/_site
@@ -244,28 +227,7 @@ srl:
 	@echo "Copying uncommitted changes to worktree..."
 	@git diff --name-only | while read f; do cp "$$f" "$(SRL_WORKTREE)/$$f"; done
 	@echo "Worktree ready: $(SRL_WORKTREE)"
-ifeq ($(OS_NAME),macos)
-ifneq (,$(filter docker,$(MAKECMDGOALS)))
-	@echo "macOS + docker target detected"
-	cd $(SRL_WORKTREE) && time docker run -it -v "$$(pwd):/metanorma" suma:latest suma build metanorma-srl.yml 2>&1 | tee metanorma-srl-log.txt
-else
-	@echo "macOS detected"
-	cd $(SRL_WORKTREE) && BUNDLE_GEMFILE=$(CURDIR)/Gemfile time bundle exec suma build metanorma-srl.yml 2>&1 | tee metanorma-srl-log.txt
-endif
-endif
-ifeq ($(OS_NAME),linux)
-	@echo "linux detected"
-	cd $(SRL_WORKTREE) && BUNDLE_GEMFILE=$(CURDIR)/Gemfile time bundle exec suma build metanorma-srl.yml 2>&1 | tee metanorma-srl-log.txt
-endif
-ifeq ($(OS_NAME),windows)
-ifneq (,$(filter docker,$(MAKECMDGOALS)))
-	@echo "windows + docker target detected"
-	cd $(SRL_WORKTREE) && time docker run -it -v "$$(pwd):/metanorma" suma:latest suma build metanorma-srl.yml 2>&1 | tee metanorma-srl-log.txt
-else
-	@echo "windows detected"
-	cd $(SRL_WORKTREE) && BUNDLE_GEMFILE=$(CURDIR)/Gemfile time bundle exec suma build metanorma-srl.yml 2>&1 | tee metanorma-srl-log.txt
-endif
-endif
+	$(call suma-build,metanorma-srl.yml,$(SRL_WORKTREE),metanorma-srl-log.txt)
 	@echo ""
 	@echo "Post-processing: Converting to SMRL format..."
 	@./scripts/suma2smrl.sh $(SRL_WORKTREE) --publish --ci-repo $(CURDIR)/../wg12-ci
@@ -276,30 +238,7 @@ endif
 
 smrl:
 	@echo "make smrl"
-ifeq ($(OS_NAME),macos)
-ifneq (,$(filter docker,$(MAKECMDGOALS)))
-	@echo "macOS + docker target detected"
-	time docker run -it -v '${CURDIR}:/metanorma' suma:latest suma build metanorma-smrl-all.yml 2>&1 | tee metanorma-smrl-all-log.txt
-else
-	@echo "macOS detected"
-	time bundle exec suma build metanorma-smrl-all.yml 2>&1 | tee metanorma-smrl-all-log.txt
-endif
-endif
-
-ifeq ($(OS_NAME),linux)
-	@echo "linux detected"
-	time bundle exec suma build metanorma-smrl-all.yml 2>&1 | tee metanorma-smrl-all-log.txt
-endif
-
-ifeq ($(OS_NAME),windows)
-ifneq (,$(filter docker,$(MAKECMDGOALS)))
-	@echo "windows + docker target detected"
-	time docker run -it -v '${CURDIR}:/metanorma' suma:latest suma build metanorma-smrl-all.yml 2>&1 | tee metanorma-smrl-all-log.txt
-else
-	@echo "windows detected"
-	time bundle exec suma build metanorma-smrl-all.yml 2>&1 | tee metanorma-smrl-all-log.txt
-endif
-endif
+	$(call suma-build,metanorma-smrl-all.yml,$(CURDIR),metanorma-smrl-all-log.txt)
 
 # Optional docker target (so make doesn't complain)
 docker:
@@ -373,28 +312,7 @@ endif
 ifeq ($(DO_MAKE-SINGLE-POWERSHELL),yes)
 	powershell -ExecutionPolicy Bypass -File scripts/feature-build.ps1 -RootModule $(ROOT)
 endif
-ifeq ($(OS_NAME),macos)
-ifneq (,$(filter docker,$(MAKECMDGOALS)))
-	@echo "macOS + docker target detected"
-	cd "$$(cat .feature-build-worktree)" && time docker run -it -v "$$(pwd):/metanorma" suma:latest suma build metanorma-feature.yml 2>&1 | tee metanorma-feature-log.txt
-else
-	@echo "macOS detected"
-	cd "$$(cat .feature-build-worktree)" && BUNDLE_GEMFILE=$(CURDIR)/Gemfile time bundle exec suma build metanorma-feature.yml 2>&1 | tee metanorma-feature-log.txt
-endif
-endif
-ifeq ($(OS_NAME),linux)
-	@echo "linux detected"
-	cd "$$(cat .feature-build-worktree)" && BUNDLE_GEMFILE=$(CURDIR)/Gemfile time bundle exec suma build metanorma-feature.yml 2>&1 | tee metanorma-feature-log.txt
-endif
-ifeq ($(OS_NAME),windows)
-ifneq (,$(filter docker,$(MAKECMDGOALS)))
-	@echo "windows + docker target detected"
-	cd "$$(cat .feature-build-worktree)" && time docker run -it -v "$$(pwd):/metanorma" suma:latest suma build metanorma-feature.yml 2>&1 | tee metanorma-feature-log.txt
-else
-	@echo "windows detected"
-	cd "$$(cat .feature-build-worktree)" && BUNDLE_GEMFILE=$(CURDIR)/Gemfile time bundle exec suma build metanorma-feature.yml 2>&1 | tee metanorma-feature-log.txt
-endif
-endif
+	$(call suma-build,metanorma-feature.yml,"$$(cat .feature-build-worktree)",metanorma-feature-log.txt)
 	@# Copy dependency graph to _site if it exists
 	@if [ -f "$$(cat .feature-build-worktree)/$(ROOT)_dependencies.svg" ]; then \
 		cp "$$(cat .feature-build-worktree)/$(ROOT)_dependencies.svg" "$$(cat .feature-build-worktree)/_site/"; \
@@ -470,28 +388,7 @@ endif
 ifeq ($(DO_MAKE-SINGLE-POWERSHELL),yes)
 	powershell -ExecutionPolicy Bypass -File scripts/feature-build.ps1 -RootModule $$(cat .feature-build-module)
 endif
-ifeq ($(OS_NAME),macos)
-ifneq (,$(filter docker,$(MAKECMDGOALS)))
-	@echo "macOS + docker target detected"
-	cd "$$(cat .feature-build-worktree)" && time docker run -it -v "$$(pwd):/metanorma" suma:latest suma build metanorma-feature.yml 2>&1 | tee metanorma-feature-log.txt
-else
-	@echo "macOS detected"
-	cd "$$(cat .feature-build-worktree)" && BUNDLE_GEMFILE=$(CURDIR)/Gemfile time bundle exec suma build metanorma-feature.yml 2>&1 | tee metanorma-feature-log.txt
-endif
-endif
-ifeq ($(OS_NAME),linux)
-	@echo "linux detected"
-	cd "$$(cat .feature-build-worktree)" && BUNDLE_GEMFILE=$(CURDIR)/Gemfile time bundle exec suma build metanorma-feature.yml 2>&1 | tee metanorma-feature-log.txt
-endif
-ifeq ($(OS_NAME),windows)
-ifneq (,$(filter docker,$(MAKECMDGOALS)))
-	@echo "windows + docker target detected"
-	cd "$$(cat .feature-build-worktree)" && time docker run -it -v "$$(pwd):/metanorma" suma:latest suma build metanorma-feature.yml 2>&1 | tee metanorma-feature-log.txt
-else
-	@echo "windows detected"
-	cd "$$(cat .feature-build-worktree)" && BUNDLE_GEMFILE=$(CURDIR)/Gemfile time bundle exec suma build metanorma-feature.yml 2>&1 | tee metanorma-feature-log.txt
-endif
-endif
+	$(call suma-build,metanorma-feature.yml,"$$(cat .feature-build-worktree)",metanorma-feature-log.txt)
 	@# Post-process based on POSTPROCESS mode
 ifeq ($(POSTPROCESS),smrl)
 	@echo "Post-processing: Converting to SMRL format..."
@@ -512,28 +409,7 @@ rebuild-feature-quick:
 	@echo "Quick rebuild in worktree: $$(cat .feature-build-worktree)"
 	@echo "NOTE: This reuses existing collection - schema dependency changes will not be detected."
 	@echo "      Use 'make rebuild-feature' for a full rebuild with eengine."
-ifeq ($(OS_NAME),macos)
-ifneq (,$(filter docker,$(MAKECMDGOALS)))
-	@echo "macOS + docker target detected"
-	cd "$$(cat .feature-build-worktree)" && time docker run -it -v "$$(pwd):/metanorma" suma:latest suma build metanorma-feature.yml 2>&1 | tee metanorma-feature-log.txt
-else
-	@echo "macOS detected"
-	cd "$$(cat .feature-build-worktree)" && BUNDLE_GEMFILE=$(CURDIR)/Gemfile time bundle exec suma build metanorma-feature.yml 2>&1 | tee metanorma-feature-log.txt
-endif
-endif
-ifeq ($(OS_NAME),linux)
-	@echo "linux detected"
-	cd "$$(cat .feature-build-worktree)" && BUNDLE_GEMFILE=$(CURDIR)/Gemfile time bundle exec suma build metanorma-feature.yml 2>&1 | tee metanorma-feature-log.txt
-endif
-ifeq ($(OS_NAME),windows)
-ifneq (,$(filter docker,$(MAKECMDGOALS)))
-	@echo "windows + docker target detected"
-	cd "$$(cat .feature-build-worktree)" && time docker run -it -v "$$(pwd):/metanorma" suma:latest suma build metanorma-feature.yml 2>&1 | tee metanorma-feature-log.txt
-else
-	@echo "windows detected"
-	cd "$$(cat .feature-build-worktree)" && BUNDLE_GEMFILE=$(CURDIR)/Gemfile time bundle exec suma build metanorma-feature.yml 2>&1 | tee metanorma-feature-log.txt
-endif
-endif
+	$(call suma-build,metanorma-feature.yml,"$$(cat .feature-build-worktree)",metanorma-feature-log.txt)
 	@# Post-process based on POSTPROCESS mode
 ifeq ($(POSTPROCESS),smrl)
 	@echo "Post-processing: Converting to SMRL format..."
@@ -562,19 +438,7 @@ endif
 ifeq ($(DO_MAKE-SINGLE-POWERSHELL),yes)
 	$(error diff_collection is not yet supported on Windows)
 endif
-ifeq ($(OS_NAME),macos)
-ifneq (,$(filter docker,$(MAKECMDGOALS)))
-	@echo "macOS + docker target detected"
-	cd "$$(cat .diff-build-worktree)" && time docker run -it -v "$$(pwd):/metanorma" suma:latest suma build metanorma-diff.yml 2>&1 | tee metanorma-diff-log.txt
-else
-	@echo "macOS detected"
-	cd "$$(cat .diff-build-worktree)" && BUNDLE_GEMFILE=$(CURDIR)/Gemfile time bundle exec suma build metanorma-diff.yml 2>&1 | tee metanorma-diff-log.txt
-endif
-endif
-ifeq ($(OS_NAME),linux)
-	@echo "linux detected"
-	cd "$$(cat .diff-build-worktree)" && BUNDLE_GEMFILE=$(CURDIR)/Gemfile time bundle exec suma build metanorma-diff.yml 2>&1 | tee metanorma-diff-log.txt
-endif
+	$(call suma-build,metanorma-diff.yml,"$$(cat .diff-build-worktree)",metanorma-diff-log.txt)
 	@# Post-process: Rename documents to ISO standard format (no index split)
 	@echo "Post-processing: Renaming documents to ISO format..."
 	@$(PYTHON) $(CURDIR)/scripts/rename_feature_docs.py "$$(cat .diff-build-worktree)/_site"
