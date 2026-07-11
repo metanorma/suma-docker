@@ -32,4 +32,6 @@ runs:
       with:
         registry: ghcr.io
         username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
+        # github.token is the workflow's GITHUB_TOKEN; composite actions
+        # cannot read secrets.* directly, so use the auto-issued token.
+        password: ${{ github.token }}
