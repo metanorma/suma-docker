@@ -1,34 +1,63 @@
-# PowerShell smoke test for the Windows image.
-# Verifies eengine, eep, metanorma, and suma are on PATH and that
-# metanorma/suma respond to --version. Catches install-layer failures
-# and Ruby regressions on the Windows side.
+# Windows adapter for the smoke contract (tests/smoke.contract).
 #
-# Usage (inside the container):
-#   powershell -File C:\tests\smoke.ps1
-#
-# Or from the host via docker:
+# Reads the contract, executes each check inside the container. Must be
+# invoked with the tests/ directory mounted at C:\tests inside the container,
+# e.g.:
 #   docker run --rm -v "$PWD\tests:C:\tests" <image> powershell -File C:\tests\smoke.ps1
+#
+# Override the contract path via SMOKE_CONTRACT env var if needed.
 [CmdletBinding()]
 param()
 $ErrorActionPreference = 'Stop'
 
-Write-Host "=== Checking binaries on PATH ==="
-foreach ($cmd in @('eengine','eep','metanorma','suma')) {
-    $p = Get-Command $cmd -ErrorAction SilentlyContinue
-    if (-not $p) {
-        Write-Host "MISSING: $cmd"
-        exit 1
-    }
-    Write-Host "OK: $cmd -> $($p.Source)"
+$contract = $env:SMOKE_CONTRACT
+if (-not $contract) { $contract = 'C:\tests\smoke.contract' }
+
+if (-not (Test-Path $contract)) {
+    Write-Host "Contract not found: $contract"
+    exit 2
 }
 
+Write-Host "Smoke contract: $contract"
 Write-Host ""
-Write-Host "=== metanorma --version ==="
-metanorma --version
 
-Write-Host ""
-Write-Host "=== suma --help (first 3 lines) ==="
-suma --help 2>&1 | Select-Object -First 3 | ForEach-Object { Write-Host $_ }
+Get-Content $contract | ForEach-Object {
+    $line = $_.Trim()
+    if (-not $line -or $line.StartsWith('#')) { return }
+
+    $parts = $line -split ' ',2
+    $kind = $parts[0]
+    $rest = if ($parts.Count -gt 1) { $parts[1].Trim() } else { '' }
+
+    switch ($kind) {
+        'exists' {
+            $p = Get-Command $rest -ErrorAction SilentlyContinue
+            if (-not $p) { Write-Host "FAIL: $rest not on PATH"; exit 1 }
+            Write-Host "OK: $rest -> $($p.Source)"
+        }
+        'succeeds' {
+            # Use cmd /c so native commands' exit codes are captured cleanly.
+            cmd /c $rest "`$null" 2>`$null | Out-Null
+            if ($LASTEXITCODE -ne 0) {
+                Write-Host "FAIL: command exited $LASTEXITCODE: $rest"
+                exit 1
+            }
+            Write-Host "OK: $rest"
+        }
+        'best_effort' {
+            try {
+                $out = cmd /c $rest 2>`$null
+                $out | Select-Object -First 3 | ForEach-Object { Write-Host $_ }
+            } catch {
+                # Swallow; best-effort.
+            }
+        }
+        default {
+            Write-Host "FAIL: unknown check type: $kind"
+            exit 1
+        }
+    }
+}
 
 Write-Host ""
 Write-Host "Smoke test passed."

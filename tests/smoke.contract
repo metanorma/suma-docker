@@ -1,0 +1,19 @@
+# Smoke contract: what every suma-docker image must satisfy at runtime.
+#
+# This file is the single source of truth for the smoke test. Both
+# tests/smoke.sh (Linux adapter) and tests/smoke.ps1 (Windows adapter)
+# consume it. Adding a new invariant means changing this file once,
+# not editing two scripts in parallel.
+#
+# Format — one check per line:
+#   exists <binary>            Binary must be on PATH.
+#   succeeds <cmd> [args...]   Command must exit 0 (output suppressed).
+#   best_effort <cmd> [args>]  Run; print first 3 lines of output; ignore failure.
+#
+# Lines starting with '#' are comments. Blank lines are ignored.
+
+exists eengine
+exists eep
+exists metanorma
+exists suma
+succeeds metanorma version
