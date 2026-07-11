@@ -39,7 +39,7 @@ Get-Content $contract | ForEach-Object {
             # Use cmd /c so native commands' exit codes are captured cleanly.
             cmd /c $rest "`$null" 2>`$null | Out-Null
             if ($LASTEXITCODE -ne 0) {
-                Write-Host "FAIL: command exited $LASTEXITCODE: $rest"
+                Write-Host "FAIL: command exited ${LASTEXITCODE}: $rest"
                 exit 1
             }
             Write-Host "OK: $rest"
