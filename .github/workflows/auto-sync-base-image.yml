@@ -36,13 +36,7 @@ jobs:
 
       - name: Detect current base-image version
         id: current
-        run: |
-          CURRENT=$(grep -E '^FROM ' Dockerfile | head -1 | awk '{print $2}' | sed 's|^.*:||')
-          if [ -z "$CURRENT" ]; then
-            echo "Could not parse base image version from Dockerfile"
-            exit 1
-          fi
-          echo "version=${CURRENT}" >> "$GITHUB_OUTPUT"
+        run: .github/scripts/image-metadata.sh >> "$GITHUB_OUTPUT"
 
       - name: Fetch latest metanorma-docker tag from Docker Hub
         id: latest
@@ -65,7 +59,7 @@ jobs:
       - name: Compare versions
         id: compare
         run: |
-          CURRENT="${{ steps.current.outputs.version }}"
+          CURRENT="${{ steps.current.outputs.linux_base_version }}"
           LATEST="${{ steps.latest.outputs.version }}"
           echo "Current pin: ${CURRENT}"
           echo "Latest published: ${LATEST}"
@@ -111,7 +105,7 @@ jobs:
           GH_TOKEN: ${{ secrets.METANORMA_CI_PAT_TOKEN }}
         run: |
           NEW="${{ steps.compare.outputs.new_version }}"
-          CURRENT="${{ steps.current.outputs.version }}"
+          CURRENT="${{ steps.current.outputs.linux_base_version }}"
           BRANCH="auto-sync/base-${NEW}"
 
           git checkout -b "$BRANCH"
