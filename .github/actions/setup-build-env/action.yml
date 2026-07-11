@@ -1,8 +1,11 @@
 name: Setup build environment
 description: |
-  Checkout the repo and optionally set up QEMU, Docker Buildx, and GHCR
-  login. Replaces the inline setup ceremony that was repeated in every
-  build-push.yml job.
+  Set up QEMU emulation, Docker Buildx, and GHCR login. Run this after
+  actions/checkout — local composite actions need the repo checked out
+  before they can be referenced via `uses: ./.github/actions/...`.
+
+  Replaces the inline qemu/buildx/login ceremony that was repeated in
+  every build-push.yml job.
 
 inputs:
   with-qemu:
@@ -14,17 +17,10 @@ inputs:
   with-login:
     description: Log into GHCR using GITHUB_TOKEN.
     default: 'false'
-  fetch-depth:
-    description: actions/checkout fetch-depth override (0 = full history).
-    default: '1'
 
 runs:
   using: composite
   steps:
-    - uses: actions/checkout@v4
-      with:
-        fetch-depth: ${{ inputs.fetch-depth }}
-
     - if: inputs.with-qemu == 'true'
       uses: docker/setup-qemu-action@v3
 
