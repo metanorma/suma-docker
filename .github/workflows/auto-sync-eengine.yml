@@ -1,0 +1,128 @@
+name: auto-sync-eengine
+
+# Polls the latest eengine release and opens a PR bumping the pin when
+# drift is detected. Runs daily off-peak, plus a manual trigger.
+#
+# Companion to auto-sync-base-image.yml. Same shape: detect drift, check
+# for existing PR, branch + bump + push + open PR. Auth via
+# METANORMA_CI_PAT_TOKEN so the opened PR triggers build-push validation.
+#
+# Behaviour:
+#   1. Read current EENGINE_VERSION from image-metadata.sh.
+#   2. Fetch latest X.Y.Z from expresslang/eengine-releases GitHub
+#      Releases via .github/scripts/latest-release.sh. (eengine's GitHub
+#      Releases ARE maintained, unlike metanorma-docker's.)
+#   3. Compare (sort -V); skip if current >= latest.
+#   4. Skip if an open PR for the same bump already exists.
+#   5. Otherwise: branch, bump Dockerfile + Dockerfile.windows, push,
+#      open PR.
+
+on:
+  schedule:
+    - cron: '23 6 * * *'  # 6 minutes after base-image sync; off-peak
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  check-and-sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.METANORMA_CI_PAT_TOKEN }}
+          fetch-depth: 0
+
+      - name: Detect current eengine version
+        id: current
+        run: .github/scripts/image-metadata.sh >> "$GITHUB_OUTPUT"
+
+      - name: Fetch latest eengine release
+        id: latest
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          LATEST=$(.github/scripts/latest-release.sh github:expresslang/eengine-releases)
+          if [ -z "$LATEST" ]; then
+            echo "Could not fetch latest eengine release"
+            exit 1
+          fi
+          echo "version=${LATEST}" >> "$GITHUB_OUTPUT"
+
+      - name: Compare versions
+        id: compare
+        run: |
+          CURRENT="${{ steps.current.outputs.eengine_version }}"
+          LATEST="${{ steps.latest.outputs.version }}"
+          echo "Current pin: ${CURRENT}"
+          echo "Latest published: ${LATEST}"
+          HIGHEST=$(printf '%s\n%s\n' "$CURRENT" "$LATEST" | sort -V | tail -1)
+          if [ "$LATEST" = "$CURRENT" ]; then
+            echo "Up to date."
+            echo "needs_sync=false" >> "$GITHUB_OUTPUT"
+          elif [ "$HIGHEST" != "$LATEST" ]; then
+            echo "Latest (${LATEST}) is older than current (${CURRENT}) — not downgrading."
+            echo "needs_sync=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "Drift detected."
+            echo "needs_sync=true" >> "$GITHUB_OUTPUT"
+            echo "new_version=${LATEST}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Check for existing open PR
+        if: steps.compare.outputs.needs_sync == 'true'
+        id: existing_pr
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          BRANCH="auto-sync/eengine-${{ steps.compare.outputs.new_version }}"
+          COUNT=$(gh pr list --head "$BRANCH" --state open --json number -q 'length' 2>/dev/null || echo 0)
+          echo "Open PRs on $BRANCH: $COUNT"
+          if [ "$COUNT" -gt 0 ]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Bump files
+        if: steps.compare.outputs.needs_sync == 'true' && steps.existing_pr.outputs.exists == 'false'
+        run: |
+          NEW="${{ steps.compare.outputs.new_version }}"
+          # Bump both Dockerfiles (Linux + Windows). Both have an
+          # `ARG EENGINE_VERSION=X.Y.Z` line at the top.
+          sed -i -E "s|^(ARG EENGINE_VERSION=)[0-9.]+|\1${NEW}|" Dockerfile Dockerfile.windows
+
+      - name: Open pull request
+        if: steps.compare.outputs.needs_sync == 'true' && steps.existing_pr.outputs.exists == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.METANORMA_CI_PAT_TOKEN }}
+        run: |
+          NEW="${{ steps.compare.outputs.new_version }}"
+          CURRENT="${{ steps.current.outputs.eengine_version }}"
+          BRANCH="auto-sync/eengine-${NEW}"
+
+          git checkout -b "$BRANCH"
+          git config user.name "metanorma-ci"
+          git config user.email "metanorma-ci@users.noreply.github.com"
+          git add Dockerfile Dockerfile.windows
+          git commit -m "Bump eengine to ${NEW}"
+          git push origin "$BRANCH"
+
+          {
+            echo "Detected that eengine has drifted from the latest release."
+            echo ""
+            echo "- **Current pin:** \`${CURRENT}\`"
+            echo "- **Latest published:** \`${NEW}\`"
+            echo "- **Upstream release:** https://github.com/expresslang/eengine-releases/releases/latest"
+            echo ""
+            echo "This PR was opened automatically by the \`auto-sync-eengine\` workflow."
+            echo "Smoke + integration tests in build-push.yml will validate the new eengine binary."
+            echo "After merge, run the \`release-tag\` workflow with \`next_version=<current suma-docker version>.1\` (suma-specific patch bump) to publish."
+          } > /tmp/pr-body.md
+
+          gh pr create \
+            --title "Bump eengine to ${NEW}" \
+            --body-file /tmp/pr-body.md \
+            --head "$BRANCH"
