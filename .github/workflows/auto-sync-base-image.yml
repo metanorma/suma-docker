@@ -1,16 +1,20 @@
 name: auto-sync-base-image
 
-# Polls the latest metanorma-docker release and opens a PR bumping the base
-# image pin when drift is detected. Runs daily off-peak, plus a manual trigger
-# for force-sync.
+# Polls the latest metanorma-docker base-image tag and opens a PR bumping
+# the pin when drift is detected. Runs daily off-peak, plus a manual
+# trigger for force-sync.
 #
 # Auth: uses METANORMA_CI_PAT_TOKEN so the opened PR triggers downstream
-# workflows (build-push validation). The default GITHUB_TOKEN would open the
-# PR but no workflows would fire on it, defeating the point.
+# workflows (build-push validation). The default GITHUB_TOKEN would open
+# the PR but no workflows would fire on it, defeating the point.
 #
 # Behaviour:
-#   1. Read current base-image version from Dockerfile FROM line.
-#   2. Fetch latest non-prerelease from metanorma/metanorma-docker releases.
+#   1. Read current base-image version from image-metadata.sh (which
+#      parses Dockerfile FROM).
+#   2. Fetch latest X.Y.Z tag from Docker Hub via
+#      .github/scripts/latest-release.sh — Docker Hub is the canonical
+#      source (metanorma-docker's GitHub Releases stopped being updated
+#      in 2021).
 #   3. Compare (sort -V); skip if current >= latest.
 #   4. Skip if an open PR for the same bump already exists.
 #   5. Otherwise: branch, bump Dockerfile + Dockerfile.windows + VERSION,
@@ -40,16 +44,10 @@ jobs:
 
       - name: Fetch latest metanorma-docker tag from Docker Hub
         id: latest
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # metanorma-docker's GitHub Releases stopped being maintained in
-          # 2021 (last entry v1.5.1). The canonical source of truth for
-          # published base-image versions is Docker Hub, where the plain
-          # `X.Y.Z` tag (e.g. `1.16.8`) tracks the latest stable release.
-          LATEST=$(curl -fsSL 'https://hub.docker.com/v2/repositories/metanorma/metanorma/tags/?page_size=100' \
-            | jq -r '.results[].name' \
-            | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' \
-            | sort -V \
-            | tail -1)
+          LATEST=$(.github/scripts/latest-release.sh dockerhub:metanorma/metanorma)
           if [ -z "$LATEST" ]; then
             echo "Could not fetch latest tag from Docker Hub"
             exit 1
@@ -95,8 +93,11 @@ jobs:
         if: steps.compare.outputs.needs_sync == 'true' && steps.existing_pr.outputs.exists == 'false'
         run: |
           NEW="${{ steps.compare.outputs.new_version }}"
+          # Linux base image
           sed -i "s|^FROM metanorma/metanorma:.*|FROM metanorma/metanorma:${NEW}|" Dockerfile
-          sed -i "s|^ARG BASE_IMAGE=metanorma/metanorma:windows-ltsc2025-.*|ARG BASE_IMAGE=metanorma/metanorma:windows-ltsc2025-${NEW}|" Dockerfile.windows
+          # Windows base image — match any windows-ltscNNNN-<version>
+          # pattern so a future ltsc2026 default doesn't silently no-op.
+          sed -i -E "s|^(ARG BASE_IMAGE=metanorma/metanorma:windows-ltsc[0-9]+-)[0-9.]+|\1${NEW}|" Dockerfile.windows
           echo "${NEW}" > VERSION
 
       - name: Open pull request
@@ -120,7 +121,7 @@ jobs:
             echo ""
             echo "- **Current pin:** \`${CURRENT}\`"
             echo "- **Latest published:** \`${NEW}\`"
-            echo "- **Upstream release:** https://github.com/metanorma/metanorma-docker/releases/latest"
+            echo "- **Upstream tag:** https://hub.docker.com/v2/repositories/metanorma/metanorma/tags/"
             echo ""
             echo "This PR was opened automatically by the \`auto-sync-base-image\` workflow."
             echo "Review the upstream release notes (especially for major bumps) before merging."
