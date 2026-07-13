@@ -141,10 +141,10 @@ $(DIRS): %:
 	@echo "make single $@"
 	# #procuding metanorma-single artifacts
 ifeq ($(DO_MAKE-SINGLE-SHELL),yes)
-	$(MAKE) MAKE-SINGLE-SHELL ID=$@
+	$(MAKE) MAKE-SINGLE ID=$@
 endif
 ifeq ($(DO_MAKE-SINGLE-POWERSHELL),yes)
-	$(MAKE) MAKE-SINGLE-POWERSHELL ID=$@
+	$(MAKE) MAKE-SINGLE ID=$@
 endif
 #suma build
 	$(call suma-build,metanorma-single.yml,$(CURDIR),metanorma-single-log.txt)
@@ -245,29 +245,8 @@ docker:
 	@true
 
 
-MAKE-SINGLE-SHELL:
-	@echo "producing metarnorma single artefact for shell for $(ID)"
-	echo "---" > metanorma-single.yml
-	echo "metanorma:" >> metanorma-single.yml
-	echo "  source:" >> metanorma-single.yml
-	echo "    files:" >> metanorma-single.yml
-	echo "      - collection-single.yml" >> metanorma-single.yml
-	echo "" >> metanorma-single.yml
-	echo "    collection:" >> metanorma-single.yml
-	echo '      organization: "ISO/TC 184/SC 4/WG 12"' >> metanorma-single.yml
-	echo '      name: "ISO 10303 STEP Single Part"' >> metanorma-single.yml
-	awk 'NR==1,/from:/' documents/$(ID)/collection.yml > collection-single.yml
-	echo "format:" >> collection-single.yml
-	echo "  - html" >> collection-single.yml
-	echo "manifest:" >> collection-single.yml
-	echo "  level: collection" >> collection-single.yml
-	echo "  title: ISO Collection" >> collection-single.yml
-	echo "  docref:" >> collection-single.yml
-	echo "      - file: documents/$(ID)/collection.yml" >> collection-single.yml
-
-
-MAKE-SINGLE-POWERSHELL:
-	@echo "producing metarnorma single artefact for windows for $(ID)"
+MAKE-SINGLE:
+	@echo "producing metanorma single artifact for $(ID)"
 	$(file > metanorma-single.yml,---)
 	$(file >> metanorma-single.yml,metanorma:)
 	$(file >> metanorma-single.yml,  source:)
@@ -277,7 +256,7 @@ MAKE-SINGLE-POWERSHELL:
 	$(file >> metanorma-single.yml,    collection:)
 	$(file >> metanorma-single.yml,      organization: "ISO/TC 184/SC 4/WG 12")
 	$(file >> metanorma-single.yml,      name: "ISO 10303 STEP Single Part")
-	$(shell  awk 'NR==1,/from:/' documents/$(ID)/collection.yml > collection-single.yml)
+	$(shell awk 'NR==1,/from:/' documents/$(ID)/collection.yml > collection-single.yml)
 	$(file >> collection-single.yml,format:)
 	$(file >> collection-single.yml,  - html)
 	$(file >> collection-single.yml,manifest:)
