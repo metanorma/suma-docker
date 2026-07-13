@@ -223,6 +223,15 @@ jobs:
       - uses: ./.github/actions/setup-build-env
         with:
           with-login: 'true'
+      - name: Wait for Docker daemon
+        shell: bash
+        run: |
+          for i in $(seq 1 30); do
+            docker info >/dev/null 2>&1 && { echo "Docker ready after $i tries"; exit 0; }
+            sleep 2
+          done
+          echo "Docker daemon did not start within 60s" >&2
+          exit 1
       - name: Build and push
         run: |
           docker build --pull -t ghcr.io/metanorma/suma-docker:windows-${{ matrix.root_image.id }} -f Dockerfile.windows --build-arg BASE_IMAGE=${{ matrix.root_image.base_image }} .
@@ -269,6 +278,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-build-env
+      - name: Wait for Docker daemon
+        shell: bash
+        run: |
+          for i in $(seq 1 30); do
+            docker info >/dev/null 2>&1 && { echo "Docker ready after $i tries"; exit 0; }
+            sleep 2
+          done
+          echo "Docker daemon did not start within 60s" >&2
+          exit 1
       - name: Build (no push)
         run: |
           docker build --pull -t suma:test -f Dockerfile.windows --build-arg BASE_IMAGE=${{ matrix.root_image.base_image }} .
