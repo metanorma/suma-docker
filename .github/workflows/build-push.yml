@@ -43,7 +43,7 @@ jobs:
       major_minor_patch: ${{ steps.version.outputs.major_minor_patch }}
       head_tag: ${{ steps.check.outputs.head_tag }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - id: version
         run: .github/scripts/image-metadata.sh >> "$GITHUB_OUTPUT"
       - name: Smoke test the metadata script
@@ -66,7 +66,7 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v')
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-build-env
         with:
           with-qemu: 'true'
@@ -127,7 +127,7 @@ jobs:
       contents: write
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -176,7 +176,7 @@ jobs:
     if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-build-env
         with:
           with-qemu: 'true'
@@ -219,7 +219,7 @@ jobs:
             id: ltsc2022
             base_image: metanorma/metanorma:windows-ltsc2022-1.16.8
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-build-env
         with:
           with-login: 'true'
@@ -276,7 +276,7 @@ jobs:
             id: ltsc2022
             base_image: metanorma/metanorma:windows-ltsc2022-1.16.8
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-build-env
       - name: Wait for Docker daemon
         shell: bash
