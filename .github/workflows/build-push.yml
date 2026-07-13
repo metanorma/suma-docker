@@ -231,8 +231,7 @@ jobs:
       - name: Smoke test
         shell: pwsh
         run: |
-          $tag = "ghcr.io/metanorma/suma-docker:windows-${{ matrix.root_image.id }}"
-          docker run --rm -v "$env:GITHUB_WORKSPACE\tests:C:\tests" $tag powershell -File C:\tests\smoke.ps1
+          ./tests/smoke-windows.ps1 -Image ghcr.io/metanorma/suma-docker:windows-${{ matrix.root_image.id }}
 
   manifest-windows:
     name: Windows manifest
@@ -276,5 +275,4 @@ jobs:
         shell: bash
       - name: Smoke test
         shell: pwsh
-        run: |
-          docker run --rm -v "$env:GITHUB_WORKSPACE\tests:C:\tests" suma:test powershell -File C:\tests\smoke.ps1
+        run: ./tests/smoke-windows.ps1 -Image suma:test
