@@ -102,6 +102,15 @@ else
   SUMA_BUILD_RUN = BUNDLE_GEMFILE=$(CURDIR)/Gemfile time bundle exec suma build
 endif
 
+# Update target dispatch: rebuild the local Docker image if 'docker' is in
+# MAKECMDGOALS, else run bundle update + fontist update on the host. Same
+# dispatch pattern as SUMA_BUILD_RUN.
+ifneq (,$(filter docker,$(MAKECMDGOALS)))
+  UPDATE_RUN = docker build -t suma:latest .
+else
+  UPDATE_RUN = bundle update && fontist update
+endif
+
 # Args: $(1) manifest filename, $(2) working directory expression, $(3) log filename.
 define suma-build
 	cd $(2) && $(SUMA_BUILD_RUN) $(1) 2>&1 | tee $(3)
@@ -120,14 +129,8 @@ POSTPROCESS ?= rename
 single: $(DIRS)
 
 update:
-ifneq (,$(filter docker,$(MAKECMDGOALS)))
-	@echo "docker target detected, update"
-		docker build -t suma:latest .
-else
-	@echo "cross-platform update"
-		bundle update
-		fontist update
-endif
+	@echo "Update (docker=$(filter docker,$(MAKECMDGOALS)))"
+	$(UPDATE_RUN)
 
 10303-%:
 	@echo "make only part $@"
