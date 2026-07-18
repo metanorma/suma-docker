@@ -43,7 +43,7 @@ jobs:
       major_minor_patch: ${{ steps.version.outputs.major_minor_patch }}
       head_tag: ${{ steps.check.outputs.head_tag }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - id: version
         run: .github/scripts/image-metadata.sh >> "$GITHUB_OUTPUT"
       - name: Smoke test the metadata script
@@ -66,7 +66,7 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v')
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-build-env
         with:
           with-qemu: 'true'
@@ -74,7 +74,7 @@ jobs:
           with-login: 'true'
 
       - id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: |
             ghcr.io/metanorma/suma-docker
@@ -92,7 +92,7 @@ jobs:
             org.opencontainers.image.version=${{ needs.job_info.outputs.version }}
 
       - name: Build for smoke test (amd64 only)
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           platforms: linux/amd64
@@ -109,7 +109,7 @@ jobs:
         run: ./tests/integration.sh suma:smoke-test
 
       - name: Build+push to GHCR
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           platforms: linux/amd64,linux/arm64
@@ -127,7 +127,7 @@ jobs:
       contents: write
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -176,14 +176,14 @@ jobs:
     if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-build-env
         with:
           with-qemu: 'true'
           with-buildx: 'true'
 
       - name: Build (load to docker)
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           platforms: linux/amd64
@@ -219,7 +219,7 @@ jobs:
             id: ltsc2022
             base_image: metanorma/metanorma:windows-ltsc2022-1.16.8
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-build-env
         with:
           with-login: 'true'
@@ -248,13 +248,13 @@ jobs:
     needs: publish-windows
     if: startsWith(github.ref, 'refs/tags/v')
     steps:
-      - uses: docker/login-action@v3
+      - uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Create and push manifest
-        uses: Noelware/docker-manifest-action@0.4.3
+        uses: Noelware/docker-manifest-action@1.0.0
         with:
           inputs: ghcr.io/metanorma/suma-docker:windows
           images: ghcr.io/metanorma/suma-docker:windows-ltsc2022,ghcr.io/metanorma/suma-docker:windows-ltsc2025
@@ -276,7 +276,7 @@ jobs:
             id: ltsc2022
             base_image: metanorma/metanorma:windows-ltsc2022-1.16.8
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-build-env
       - name: Wait for Docker daemon
         shell: bash
