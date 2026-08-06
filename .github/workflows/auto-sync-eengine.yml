@@ -93,6 +93,13 @@ jobs:
           # Bump both Dockerfiles (Linux + Windows). Both have an
           # `ARG EENGINE_VERSION=X.Y.Z` line at the top.
           sed -i -E "s|^(ARG EENGINE_VERSION=)[0-9.]+|\1${NEW}|" Dockerfile Dockerfile.windows
+          # Bump VERSION to a suma-specific patch (X.Y.Z.N). Strip any
+          # existing .N suffix, then append .1.
+          CURRENT_VERSION=$(cat VERSION)
+          BASE_VERSION=$(echo "${CURRENT_VERSION}" | cut -d. -f1-3)
+          PATCH_VERSION="${BASE_VERSION}.1"
+          echo "${PATCH_VERSION}" > VERSION
+          echo "Bumped VERSION: ${CURRENT_VERSION} → ${PATCH_VERSION}"
 
       - name: Open pull request
         if: steps.compare.outputs.needs_sync == 'true' && steps.existing_pr.outputs.exists == 'false'
@@ -106,7 +113,7 @@ jobs:
           git checkout -b "$BRANCH"
           git config user.name "metanorma-ci"
           git config user.email "metanorma-ci@users.noreply.github.com"
-          git add Dockerfile Dockerfile.windows
+          git add Dockerfile Dockerfile.windows VERSION
           git commit -m "Bump eengine to ${NEW}"
           git push origin "$BRANCH"
 
@@ -119,10 +126,20 @@ jobs:
             echo ""
             echo "This PR was opened automatically by the \`auto-sync-eengine\` workflow."
             echo "Smoke + integration tests in build-push.yml will validate the new eengine binary."
-            echo "After merge, run the \`release-tag\` workflow with \`next_version=<current suma-docker version>.1\` (suma-specific patch bump) to publish."
           } > /tmp/pr-body.md
 
           gh pr create \
             --title "Bump eengine to ${NEW}" \
             --body-file /tmp/pr-body.md \
             --head "$BRANCH"
+
+          # Auto-merge for minor/patch eengine bumps. Major eengine version
+          # changes (e.g. 5.x → 6.x) require manual review.
+          CURRENT_MAJOR=$(echo "${CURRENT}" | cut -d. -f1)
+          NEW_MAJOR=$(echo "${NEW}" | cut -d. -f1)
+          if [ "${CURRENT_MAJOR}" = "${NEW_MAJOR}" ]; then
+            echo "Minor/patch eengine bump (${CURRENT} → ${NEW}). Enabling auto-merge."
+            gh pr merge --auto --rebase --delete-branch "$BRANCH"
+          else
+            echo "Major eengine version change (${CURRENT_MAJOR} → ${NEW_MAJOR}). Manual merge required."
+          fi

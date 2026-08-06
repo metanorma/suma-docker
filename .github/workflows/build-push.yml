@@ -59,6 +59,49 @@ jobs:
           fi
           echo "head_tag=${tag}" >> $GITHUB_OUTPUT
 
+  # When an auto-sync PR merges, VERSION changes on main. This job
+  # detects that change and pushes the tag, which triggers the publish
+  # pipeline above. Without this, merged auto-sync PRs sit on main
+  # with no published image until someone manually runs release-tag.
+  auto-tag:
+    name: Auto-tag on VERSION change
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 2
+          token: ${{ secrets.METANORMA_CI_PAT_TOKEN }}
+
+      - name: Check if VERSION changed
+        id: check
+        run: |
+          if git diff --name-only HEAD~1 HEAD | grep -q "^VERSION$"; then
+            VERSION=$(cat VERSION)
+            # Check if tag already exists (avoid re-tagging)
+            if git rev-parse "v${VERSION}" >/dev/null 2>&1; then
+              echo "changed=false" >> "$GITHUB_OUTPUT"
+              echo "Tag v${VERSION} already exists, skipping."
+            else
+              echo "changed=true" >> "$GITHUB_OUTPUT"
+              echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+              echo "VERSION changed to ${VERSION}. Will push tag."
+            fi
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Push tag
+        if: steps.check.outputs.changed == 'true'
+        run: |
+          VERSION="${{ steps.check.outputs.version }}"
+          git config user.name "metanorma-ci"
+          git config user.email "metanorma-ci@users.noreply.github.com"
+          git tag "v${VERSION}"
+          git push origin "v${VERSION}"
+
   publish-linux:
     name: Publish (linux)
     runs-on: ubuntu-latest
@@ -226,11 +269,11 @@ jobs:
       - name: Wait for Docker daemon
         shell: bash
         run: |
-          for i in $(seq 1 30); do
+          for i in $(seq 1 90); do
             docker info >/dev/null 2>&1 && { echo "Docker ready after $i tries"; exit 0; }
             sleep 2
           done
-          echo "Docker daemon did not start within 60s" >&2
+          echo "Docker daemon did not start within 180s" >&2
           exit 1
       - name: Build and push
         run: |
@@ -280,11 +323,11 @@ jobs:
       - name: Wait for Docker daemon
         shell: bash
         run: |
-          for i in $(seq 1 30); do
+          for i in $(seq 1 90); do
             docker info >/dev/null 2>&1 && { echo "Docker ready after $i tries"; exit 0; }
             sleep 2
           done
-          echo "Docker daemon did not start within 60s" >&2
+          echo "Docker daemon did not start within 180s" >&2
           exit 1
       - name: Build (no push)
         run: |

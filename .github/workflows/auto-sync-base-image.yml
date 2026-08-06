@@ -124,11 +124,20 @@ jobs:
             echo "- **Upstream tag:** https://hub.docker.com/v2/repositories/metanorma/metanorma/tags/"
             echo ""
             echo "This PR was opened automatically by the \`auto-sync-base-image\` workflow."
-            echo "Review the upstream release notes (especially for major bumps) before merging."
-            echo "After merge, run the \`release-tag\` workflow with \`next_version=${NEW}\` to publish."
           } > /tmp/pr-body.md
 
           gh pr create \
             --title "Bump base image to metanorma ${NEW}" \
             --body-file /tmp/pr-body.md \
             --head "$BRANCH"
+
+          # Auto-merge for minor/patch bumps. Major version bumps require
+          # manual review — the bundled suma gem may have breaking changes.
+          CURRENT_MAJOR=$(echo "${CURRENT}" | cut -d. -f1)
+          NEW_MAJOR=$(echo "${NEW}" | cut -d. -f1)
+          if [ "${CURRENT_MAJOR}" = "${NEW_MAJOR}" ]; then
+            echo "Minor/patch bump (${CURRENT} → ${NEW}). Enabling auto-merge."
+            gh pr merge --auto --rebase --delete-branch "$BRANCH"
+          else
+            echo "Major version change (${CURRENT_MAJOR} → ${NEW_MAJOR}). Manual merge required."
+          fi
