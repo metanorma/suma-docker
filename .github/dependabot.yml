@@ -14,18 +14,8 @@ updates:
       prefix: ci
       include: scope
 
-  # Keep the base image digest current. The auto-sync-base-image workflow
-  # already handles major/minor base-image bumps via PRs; this entry just
-  # ensures Dependabot can also flag drift if the cron workflow breaks.
-  - package-ecosystem: docker
-    directory: /
-    schedule:
-      interval: weekly
-      day: monday
-    open-pull-requests-limit: 1
-    labels:
-      - dependencies
-      - dockerfile
-    commit-message:
-      prefix: dockerfile
-      include: scope
+  # NOTE: the `docker` ecosystem entry was removed. It competed with
+  # auto-sync-base-image.yml — both watched for Dockerfile FROM bumps
+  # and opened duplicate PRs (see PR #45 vs #46). The auto-sync workflow
+  # is strictly better: it also bumps Dockerfile.windows + VERSION, runs
+  # daily (vs weekly), and supports auto-merge.
