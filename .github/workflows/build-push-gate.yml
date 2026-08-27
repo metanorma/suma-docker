@@ -1,0 +1,51 @@
+name: build-push-gate
+
+# Reports the three "Validate build (...)" required checks when
+# build-push.yml is skipped by its paths filter.
+#
+# Why: main is protected by a ruleset requiring "Validate build (linux)",
+# "Validate build (windows-ltsc2025)" and "Validate build
+# (windows-ltsc2022)". On PRs that change none of the image-affecting
+# files, build-push.yml never triggers, so those checks would sit on
+# "Expected — Waiting for status to be reported" and block the merge
+# forever. This workflow reports the same check names as instant no-op
+# successes — the workaround from GitHub's "Handling skipped but
+# required checks" docs.
+#
+# The paths-ignore list below mirrors build-push.yml's
+# on.pull_request.paths exactly, so this workflow runs iff build-push.yml
+# does not — the two never report the same check name on one PR.
+
+on:
+  pull_request:
+    branches: [ main ]
+    paths-ignore:
+      - 'Dockerfile'
+      - 'Dockerfile.windows'
+      - 'VERSION'
+      - 'tests/**'
+      - '.github/scripts/**'
+      - '.github/actions/**'
+      - '.github/workflows/build-push.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  validate-linux:
+    name: Validate build (linux)
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "No image-affecting files changed; build-push.yml skipped by paths filter."
+
+  validate-windows-ltsc2025:
+    name: Validate build (windows-ltsc2025)
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "No image-affecting files changed; build-push.yml skipped by paths filter."
+
+  validate-windows-ltsc2022:
+    name: Validate build (windows-ltsc2022)
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "No image-affecting files changed; build-push.yml skipped by paths filter."

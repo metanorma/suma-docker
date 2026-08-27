@@ -16,6 +16,9 @@ name: auto-sync-eengine
 #   4. Skip if an open PR for the same bump already exists.
 #   5. Otherwise: branch, bump Dockerfile + Dockerfile.windows, push,
 #      open PR.
+#   6. Arm auto-merge on the drift PR (minor/patch only). Runs on every
+#      sync attempt while the PR stays open, so a previously rejected
+#      enablePullRequestAutoMerge (no branch protection) is retried.
 
 on:
   schedule:
@@ -133,13 +136,33 @@ jobs:
             --body-file /tmp/pr-body.md \
             --head "$BRANCH"
 
+      - name: Enable auto-merge
+        if: steps.compare.outputs.needs_sync == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.METANORMA_CI_PAT_TOKEN }}
+        run: |
+          CURRENT="${{ steps.current.outputs.eengine_version }}"
+          NEW="${{ steps.compare.outputs.new_version }}"
+          BRANCH="auto-sync/eengine-${NEW}"
+
           # Auto-merge for minor/patch eengine bumps. Major eengine version
           # changes (e.g. 5.x → 6.x) require manual review.
           CURRENT_MAJOR=$(echo "${CURRENT}" | cut -d. -f1)
           NEW_MAJOR=$(echo "${NEW}" | cut -d. -f1)
-          if [ "${CURRENT_MAJOR}" = "${NEW_MAJOR}" ]; then
-            echo "Minor/patch eengine bump (${CURRENT} → ${NEW}). Enabling auto-merge."
-            gh pr merge --auto --rebase --delete-branch "$BRANCH"
-          else
+          if [ "${CURRENT_MAJOR}" != "${NEW_MAJOR}" ]; then
             echo "Major eengine version change (${CURRENT_MAJOR} → ${NEW_MAJOR}). Manual merge required."
+            exit 0
           fi
+
+          PR=$(gh pr list --head "$BRANCH" --state open --json number -q '.[0].number')
+          if [ -z "${PR}" ]; then
+            echo "No open PR found on ${BRANCH}."
+            exit 1
+          fi
+
+          # Deliberately not inside the PR-creation step: this must also
+          # run when the PR already exists, so an arm attempt that failed
+          # (e.g. branch protection was missing) is retried next run
+          # instead of stalling the PR forever.
+          echo "Minor/patch eengine bump (${CURRENT} → ${NEW}). Enabling auto-merge on #${PR}."
+          gh pr merge --auto --rebase --delete-branch "${PR}"
