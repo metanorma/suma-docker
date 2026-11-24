@@ -1,4 +1,4 @@
-FROM metanorma/metanorma:1.18.6
+FROM metanorma/metanorma:1.18.7
 LABEL maintainer="Metanorma Team <metanorma@ribose.com>"
 
 ARG EENGINE_VERSION=5.2.8
