@@ -1,7 +1,7 @@
 FROM metanorma/metanorma:1.18.7
 LABEL maintainer="Metanorma Team <metanorma@ribose.com>"
 
-ARG EENGINE_VERSION=5.2.8
+ARG EENGINE_VERSION=5.2.9
 
 RUN ARCH=$(uname -m) && \
     if [ "$ARCH" = "x86_64" ]; then \
